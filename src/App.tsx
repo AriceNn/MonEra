@@ -12,6 +12,7 @@ import { SettingsPage } from './pages/SettingsPage';
 import { RecurringTransactionsPage } from './pages/RecurringTransactionsPage';
 import { BudgetPage } from './pages/BudgetPage';
 import { TransactionsPage } from './pages/TransactionsPage';
+import { AnalyticsPage } from './pages/AnalyticsPage';
 import { NotificationSettingsPanel } from './components/notifications/NotificationSettingsPanel';
 import { generateFinancialSummary } from './utils/calculations';
 import { convertCurrency, fetchLatestRates, updateExchangeRates, loadPersistedRates } from './utils/exchange';
@@ -61,7 +62,7 @@ function DashboardContent({ onRatesUpdate }: DashboardContentProps) {
   const [editingTransaction, setEditingTransaction] = useState<Transaction | undefined>(undefined);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isNotificationSettingsOpen, setIsNotificationSettingsOpen] = useState(false);
-  const [currentPage, setCurrentPage] = useState<'dashboard' | 'transactions' | 'recurring' | 'budget' | 'settings'>('dashboard');
+  const [currentPage, setCurrentPage] = useState<'dashboard' | 'transactions' | 'recurring' | 'budget' | 'analytics' | 'settings'>('dashboard');
   
   const currentDate = new Date();
   const [selectedMonth, setSelectedMonth] = useState(currentDate.getMonth());
@@ -280,6 +281,16 @@ function DashboardContent({ onRatesUpdate }: DashboardContentProps) {
           currency={settings.currency}
           selectedMonth={selectedMonth}
           selectedYear={selectedYear}
+        />
+      )}
+
+      {/* Analytics Page */}
+      {currentPage === 'analytics' && (
+        <AnalyticsPage
+          transactions={transactions}
+          language={settings.language}
+          currency={settings.currency}
+          getDisplayAmount={getDisplayAmount}
         />
       )}
 

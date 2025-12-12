@@ -1,4 +1,4 @@
-import { Settings, Moon, Sun, Globe, DollarSign, LayoutDashboard, Repeat, Target, List } from 'lucide-react';
+import { Settings, Moon, Sun, Globe, DollarSign, LayoutDashboard, Repeat, Target, List, BarChart3 } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { NotificationCenter } from '../notifications/NotificationCenter';
 import type { Notification } from '../../utils/notifications';
@@ -8,8 +8,8 @@ interface AppShellProps {
   theme: 'light' | 'dark';
   language: 'tr' | 'en';
   currency: 'TRY' | 'USD' | 'EUR' | 'GBP';
-  currentPage?: 'dashboard' | 'transactions' | 'recurring' | 'budget' | 'settings';
-  onNavigate?: (page: 'dashboard' | 'transactions' | 'recurring' | 'budget' | 'settings') => void;
+  currentPage?: 'dashboard' | 'transactions' | 'recurring' | 'budget' | 'analytics' | 'settings';
+  onNavigate?: (page: 'dashboard' | 'transactions' | 'recurring' | 'budget' | 'analytics' | 'settings') => void;
   onThemeToggle: () => void;
   onLanguageToggle: () => void;
   onCurrencyToggle?: () => void;
@@ -48,6 +48,7 @@ export function AppShell({
     { id: 'transactions' as const, label: language === 'tr' ? 'İşlemler' : 'Transactions', icon: List },
     { id: 'recurring' as const, label: language === 'tr' ? 'Tekrarlayan' : 'Recurring', icon: Repeat },
     { id: 'budget' as const, label: language === 'tr' ? 'Bütçe' : 'Budget', icon: Target },
+    { id: 'analytics' as const, label: language === 'tr' ? 'Analiz' : 'Analytics', icon: BarChart3 },
   ];
 
   return (
