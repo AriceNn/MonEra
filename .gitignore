@@ -31,3 +31,5 @@ dist-ssr
 
 memoryBank.txt
 future.txt
+
+*.sql

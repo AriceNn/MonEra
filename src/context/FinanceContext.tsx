@@ -7,7 +7,10 @@ import { DEFAULT_APP_SETTINGS } from '../utils/constants';
 import { calculateCashBalance } from '../utils/calculations';
 import type { StorageAdapter } from '../db/StorageAdapter';
 import { getCurrentAdapter, autoMigrate, cleanupBackup } from '../db/migration';
+import { IndexedDBAdapter } from '../db/IndexedDBAdapter';
 import { NotificationManager, DEFAULT_NOTIFICATION_SETTINGS, type Notification, type NotificationSettings } from '../utils/notifications';
+import { syncService, type SyncStatus, type SyncResult } from '../services/syncService';
+import { useAuth } from './AuthContext';
 
 export interface FinanceContextType {
   transactions: Transaction[];
@@ -53,6 +56,12 @@ export interface FinanceContextType {
   exportData: () => string;
   importData: (data: string) => boolean;
   clearAll: () => void;
+  
+  // Cloud sync actions (P3 Sprint 2)
+  syncStatus: SyncStatus;
+  syncNow: () => Promise<SyncResult>;
+  autoSync: boolean;
+  setAutoSync: (enabled: boolean) => void;
 }
 
 export const FinanceContext = createContext<FinanceContextType | undefined>(undefined);
@@ -63,6 +72,8 @@ interface FinanceProviderProps {
 }
 
 export function FinanceProvider({ children, exchangeRates = {} }: FinanceProviderProps) {
+  const { isAuthenticated, isCloudEnabled } = useAuth();
+  
   // Storage adapter - will be IndexedDB after migration, localStorage as fallback
   const [adapter, setAdapter] = useState<StorageAdapter | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -78,6 +89,13 @@ export function FinanceProvider({ children, exchangeRates = {} }: FinanceProvide
   const [notificationSettings, setNotificationSettings] = useState<NotificationSettings>(DEFAULT_NOTIFICATION_SETTINGS);
   const [notificationManager] = useState(() => new NotificationManager(DEFAULT_NOTIFICATION_SETTINGS, settings.language));
   const [notifications, setNotifications] = useState<Notification[]>([]);
+  
+  // Cloud sync state (P3 Sprint 2)
+  const [syncStatus, setSyncStatus] = useState<SyncStatus>(syncService.getSyncStatus());
+  const [autoSync, setAutoSync] = useState<boolean>(() => {
+    const stored = localStorage.getItem('fintrack-auto-sync');
+    return stored ? JSON.parse(stored) : true;
+  });
 
   // Load notification settings from localStorage
   useEffect(() => {
@@ -107,14 +125,22 @@ export function FinanceProvider({ children, exchangeRates = {} }: FinanceProvide
 
     async function initialize() {
       try {
-        // Auto-migrate if needed
-        const migrationResult = await autoMigrate();
-        if (migrationResult) {
-          // Migration successful
-        }
+        let storageAdapter: StorageAdapter;
+        
+        // If cloud sync is enabled, ALWAYS use IndexedDB
+        if (isCloudEnabled) {
+          console.log('[FinanceContext] Cloud sync enabled - using IndexedDB adapter');
+          storageAdapter = new IndexedDBAdapter();
+        } else {
+          // Auto-migrate if needed
+          const migrationResult = await autoMigrate();
+          if (migrationResult) {
+            // Migration successful
+          }
 
-        // Get current adapter (IndexedDB or localStorage)
-        const storageAdapter = await getCurrentAdapter();
+          // Get current adapter (IndexedDB or localStorage)
+          storageAdapter = await getCurrentAdapter();
+        }
         
         if (!mounted) return;
 
@@ -131,7 +157,21 @@ export function FinanceProvider({ children, exchangeRates = {} }: FinanceProvide
         setTransactions(txs);
         setBudgets(bdgs);
         setRecurringTransactions(recur);
-        setSettings(sett);
+        
+        // Detect system theme preference and use it if no theme was explicitly saved
+        const systemTheme: 'light' | 'dark' = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+        
+        // Check if this is first load (no transactions, no budgets, default theme)
+        const isFirstLoad = txs.length === 0 && bdgs.length === 0 && sett.theme === DEFAULT_APP_SETTINGS.theme;
+        
+        if (isFirstLoad) {
+          // First time user - use system theme
+          const settingsWithSystemTheme: AppSettings = { ...sett, theme: systemTheme };
+          setSettings(settingsWithSystemTheme);
+        } else {
+          setSettings(sett);
+        }
+        
         setAdapter(storageAdapter);
         setIsLoading(false);
 
@@ -246,9 +286,24 @@ export function FinanceProvider({ children, exchangeRates = {} }: FinanceProvide
         return updated;
       });
       
+      // Push to cloud if authenticated and auto-sync enabled
+      if (isAuthenticated && isCloudEnabled && autoSync) {
+        console.log('📤 [FinanceContext] Auto-sync enabled, pushing transaction to cloud...', {
+          isAuthenticated,
+          isCloudEnabled,
+          autoSync,
+          transactionId: newTransaction.id
+        });
+        syncService.pushTransaction(newTransaction).catch(error => {
+          console.error('❌ [FinanceContext] Error syncing transaction:', error);
+        });
+      } else {
+        console.log('⚠️ [FinanceContext] Auto-sync skipped:', { isAuthenticated, isCloudEnabled, autoSync });
+      }
+      
       return true;
     },
-    [adapter, transactions, convertToTRY, budgets, notificationManager]
+    [adapter, transactions, convertToTRY, budgets, notificationManager, isAuthenticated, isCloudEnabled, autoSync]
   );
 
   const deleteTransaction = useCallback(
@@ -269,8 +324,23 @@ export function FinanceProvider({ children, exchangeRates = {} }: FinanceProvide
         newSet.add(id);
         return newSet;
       });
+      
+      // Delete from cloud if authenticated
+      if (isAuthenticated && isCloudEnabled && autoSync) {
+        console.log('🗑️ [FinanceContext] Auto-sync enabled, deleting from cloud...', {
+          isAuthenticated,
+          isCloudEnabled,
+          autoSync,
+          transactionId: id
+        });
+        syncService.deleteTransaction(id).catch(error => {
+          console.error('❌ [FinanceContext] Error syncing deletion:', error);
+        });
+      } else {
+        console.log('⚠️ [FinanceContext] Delete sync skipped:', { isAuthenticated, isCloudEnabled, autoSync });
+      }
     },
-    [adapter]
+    [adapter, isAuthenticated, isCloudEnabled, autoSync]
   );
 
   const addBulkTransactions = useCallback(
@@ -870,6 +940,116 @@ export function FinanceProvider({ children, exchangeRates = {} }: FinanceProvide
     setNotifications(notificationManager.getNotifications());
   }, [notificationManager]);
 
+  // Cloud sync actions (P3 Sprint 2)
+  const syncNow = useCallback(async (): Promise<SyncResult> => {
+    console.log('🔄 [FinanceContext] syncNow called:', { isAuthenticated, isCloudEnabled, hasAdapter: !!adapter });
+    
+    if (!isAuthenticated || !isCloudEnabled) {
+      console.warn('⚠️ [FinanceContext] Sync skipped - not authenticated or cloud disabled');
+      return {
+        success: false,
+        synced: 0,
+        conflicts: 0,
+        errors: ['User not authenticated or cloud not enabled'],
+      };
+    }
+
+    const result = await syncService.syncAll();
+    console.log('✅ [FinanceContext] Sync completed, reloading transactions...', result);
+    
+    // Always reload data from IndexedDB after sync attempt
+    if (adapter) {
+      try {
+        const txs = await adapter.getAllTransactions();
+        console.log(`📊 [FinanceContext] Loaded ${txs.length} transactions from IndexedDB`);
+        setTransactions(txs);
+      } catch (error) {
+        console.error('❌ [FinanceContext] Failed to reload transactions:', error);
+      }
+    }
+    
+    return result;
+  }, [isAuthenticated, isCloudEnabled, adapter]);
+
+  const handleAutoSyncChange = useCallback((enabled: boolean) => {
+    setAutoSync(enabled);
+    localStorage.setItem('fintrack-auto-sync', JSON.stringify(enabled));
+  }, []);
+
+  // Subscribe to sync status changes
+  useEffect(() => {
+    const unsubscribe = syncService.onSyncStatusChange((status) => {
+      setSyncStatus(status);
+    });
+    
+    return unsubscribe;
+  }, []);
+
+  // Auto-sync on mount if authenticated
+  useEffect(() => {
+    console.log('🔍 [FinanceContext] Auto-sync check:', { 
+      isAuthenticated, 
+      isCloudEnabled, 
+      autoSync, 
+      isLoading,
+      hasAdapter: !!adapter 
+    });
+    
+    if (isAuthenticated && isCloudEnabled && autoSync && !isLoading && adapter) {
+      console.log('🚀 [FinanceContext] Triggering auto-sync in 500ms...');
+      // Short delay to ensure UI is ready
+      const timer = setTimeout(async () => {
+        console.log('⏱️ [FinanceContext] Executing auto-sync now...');
+        try {
+          const result = await syncService.syncAll();
+          console.log('✅ [FinanceContext] Sync completed:', result);
+          
+          // Wait for IndexedDB writes to complete
+          await new Promise(resolve => setTimeout(resolve, 200));
+          
+          // Force reload ALL data from storage
+          if (adapter) {
+            console.log('🔄 [FinanceContext] Reloading ALL data from IndexedDB...');
+            
+            try {
+              const [txs, bdgs, recur, sett] = await Promise.all([
+                adapter.getAllTransactions(),
+                adapter.getAllBudgets(),
+                adapter.getAllRecurring(),
+                adapter.getSettings()
+              ]);
+              
+              console.log(`📊 [FinanceContext] Loaded from IndexedDB:`, {
+                transactions: txs.length,
+                budgets: bdgs.length,
+                recurring: recur.length
+              });
+              
+              // Force state update
+              setTransactions(txs);
+              setBudgets(bdgs);
+              setRecurringTransactions(recur);
+              setSettings(sett);
+              
+              console.log('✅ [FinanceContext] State updated successfully!');
+            } catch (error) {
+              console.error('❌ [FinanceContext] Failed to reload data:', error);
+            }
+          }
+        } catch (error) {
+          console.error('❌ [FinanceContext] Auto-sync error:', error);
+        }
+      }, 500);
+      
+      return () => {
+        console.log('🧹 [FinanceContext] Cleaning up auto-sync timer');
+        clearTimeout(timer);
+      };
+    } else {
+      console.log('⏭️ [FinanceContext] Auto-sync skipped');
+    }
+  }, [isAuthenticated, isCloudEnabled, autoSync, isLoading, adapter]);
+
   const value: FinanceContextType = {
     transactions,
     settings,
@@ -902,6 +1082,10 @@ export function FinanceProvider({ children, exchangeRates = {} }: FinanceProvide
     exportData,
     importData,
     clearAll,
+    syncStatus,
+    syncNow,
+    autoSync,
+    setAutoSync: handleAutoSyncChange,
   };
 
   // Show loading state while initializing storage

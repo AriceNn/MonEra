@@ -9,6 +9,7 @@ import { INCOME_CATEGORIES, EXPENSE_CATEGORIES, SAVINGS_CATEGORIES } from '../..
 import { dateToISOString } from '../../utils/formatters';
 import { t, translateCategory } from '../../utils/i18n';
 import { useFinance } from '../../hooks/useFinance';
+import { useAlert } from '../../hooks/useAlert';
 
 interface TransactionFormProps {
   mode: 'add' | 'edit';
@@ -30,6 +31,7 @@ export function TransactionForm({
   currency
 }: TransactionFormProps) {
   const { addRecurringTransaction, generateRecurringTransactions, getBudgetProgress, budgets } = useFinance();
+  const { showConfirm, AlertComponent } = useAlert();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isRecurring, setIsRecurring] = useState(false);
   const [budgetWarning, setBudgetWarning] = useState<string | null>(null);
@@ -100,7 +102,7 @@ export function TransactionForm({
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!validateForm()) return;
 
     // Check budget before adding expense
@@ -118,11 +120,17 @@ export function TransactionForm({
           const projectedPercentage = (projectedSpent / progress.limit) * 100;
           
           if (projectedPercentage >= budget.alertThreshold) {
-            const warningMsg = language === 'tr'
-              ? `Dikkat! Bu işlem bütçenizin %${projectedPercentage.toFixed(0)}'ine ulaşmanıza neden olacak. Devam etmek istiyor musunuz?`
-              : `Warning! This transaction will bring you to ${projectedPercentage.toFixed(0)}% of your budget. Do you want to continue?`;
+            const confirmed = await showConfirm({
+              title: language === 'tr' ? 'Bütçe Uyarısı' : 'Budget Warning',
+              message: language === 'tr'
+                ? `Dikkat! Bu işlem bütçenizin %${projectedPercentage.toFixed(0)}'ine ulaşmanıza neden olacak. Devam etmek istiyor musunuz?`
+                : `Warning! This transaction will bring you to ${projectedPercentage.toFixed(0)}% of your budget. Do you want to continue?`,
+              type: 'warning',
+              confirmText: language === 'tr' ? 'Devam Et' : 'Continue',
+              cancelText: language === 'tr' ? 'İptal' : 'Cancel',
+            });
             
-            if (!window.confirm(warningMsg)) {
+            if (!confirmed) {
               return;
             }
           }
@@ -375,6 +383,9 @@ export function TransactionForm({
           )}
         </div>
       </Modal>
+
+      {/* Alert Dialog */}
+      {AlertComponent}
     </>
   );
 }

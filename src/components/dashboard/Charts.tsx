@@ -28,10 +28,27 @@ const TOOLTIP_STYLE = {
   backgroundColor: '#1e293b',
   border: 'none',
   borderRadius: '6px',
-  color: '#fff',
+  color: '#ffffff',
   fontSize: '12px',
   padding: '8px',
   boxShadow: '0 4px 6px rgba(0,0,0,0.3)'
+};
+
+// Custom tooltip renderer to ensure white text
+const CustomTooltip = ({ active, payload, label }: any) => {
+  if (!active || !payload || !payload.length) return null;
+  
+  return (
+    <div style={TOOLTIP_STYLE}>
+      {label && <p style={{ color: '#ffffff', marginBottom: '4px', fontWeight: 600 }}>{label}</p>}
+      {payload.map((entry: any, index: number) => (
+        <p key={index} style={{ color: '#ffffff', margin: '2px 0' }}>
+          <span style={{ color: entry.color }}>{entry.name}: </span>
+          {entry.value}
+        </p>
+      ))}
+    </div>
+  );
 };
 
 export function Charts({ transactions, currency, language, theme = 'light', selectedMonth = 0, selectedYear = 2024 }: ChartsProps) {
@@ -286,7 +303,7 @@ export function Charts({ transactions, currency, language, theme = 'light', sele
               ))}
             </Pie>
             <Tooltip
-              contentStyle={TOOLTIP_STYLE}
+              content={<CustomTooltip />}
               formatter={(value: number) => formatCurrency(value, currency as any)}
             />
           </PieChart>

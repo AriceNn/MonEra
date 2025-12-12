@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react';
 import { Card } from '../components/ui/Card';
 import { useFinance } from '../hooks/useFinance';
+import { useAlert } from '../hooks/useAlert';
 import { TransactionForm } from '../components/transactions/TransactionForm';
 import type { Transaction } from '../types';
 import { formatCurrency } from '../utils/formatters';
@@ -18,6 +19,7 @@ interface TransactionsPageProps {
 
 export function TransactionsPage({ language, currency }: TransactionsPageProps) {
   const { transactions, deleteTransaction, updateTransaction } = useFinance();
+  const { showConfirm, AlertComponent } = useAlert();
   const [editingTransaction, setEditingTransaction] = useState<Transaction | undefined>(undefined);
   
   // Filter states
@@ -91,8 +93,18 @@ export function TransactionsPage({ language, currency }: TransactionsPageProps) 
     return { totalIncome, totalExpense, totalSavings, count: filteredTransactions.length };
   }, [filteredTransactions, currency]);
 
-  const handleDelete = (id: string) => {
-    if (window.confirm(language === 'tr' ? 'Bu işlemi silmek istediğinizden emin misiniz?' : 'Are you sure you want to delete this transaction?')) {
+  const handleDelete = async (id: string) => {
+    const confirmed = await showConfirm({
+      title: language === 'tr' ? 'İşlemi Sil' : 'Delete Transaction',
+      message: language === 'tr' 
+        ? 'Bu işlemi silmek istediğinizden emin misiniz? Bu işlem geri alınamaz.'
+        : 'Are you sure you want to delete this transaction? This action cannot be undone.',
+      type: 'danger',
+      confirmText: language === 'tr' ? 'Sil' : 'Delete',
+      cancelText: language === 'tr' ? 'İptal' : 'Cancel',
+    });
+    
+    if (confirmed) {
       deleteTransaction(id);
     }
   };
@@ -458,6 +470,9 @@ export function TransactionsPage({ language, currency }: TransactionsPageProps) 
           currency={currency}
         />
       )}
+
+      {/* Alert Dialog */}
+      {AlertComponent}
     </div>
   );
 }

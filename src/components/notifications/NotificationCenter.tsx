@@ -116,7 +116,7 @@ export function NotificationCenter({
       {/* Bell Icon Button */}
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="relative p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+        className="relative p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700/50 transition-colors"
         aria-label="Notifications"
       >
         <Bell className="w-5 h-5 text-slate-600 dark:text-slate-400" />
@@ -152,7 +152,7 @@ export function NotificationCenter({
               {/* Mobile Close Button */}
               <button
                 onClick={() => setIsOpen(false)}
-                className="md:hidden p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                className="md:hidden p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700/50 transition-colors"
               >
                 <X className="w-5 h-5 text-slate-600 dark:text-slate-400" />
               </button>

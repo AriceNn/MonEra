@@ -1,6 +1,7 @@
 import { Calendar } from 'lucide-react';
 import { useState } from 'react';
 import { Button } from '../ui/Button';
+import { useAlert } from '../../hooks/useAlert';
 
 export interface DateRange {
   start: Date;
@@ -24,6 +25,7 @@ const PRESETS = [
 ];
 
 export function DateRangeSelector({ value, onChange, language }: DateRangeSelectorProps) {
+  const { showAlert, AlertComponent } = useAlert();
   const [showCustomPicker, setShowCustomPicker] = useState(false);
   const [customStart, setCustomStart] = useState(value.start.toISOString().split('T')[0]);
   const [customEnd, setCustomEnd] = useState(value.end.toISOString().split('T')[0]);
@@ -58,12 +60,20 @@ export function DateRangeSelector({ value, onChange, language }: DateRangeSelect
     setShowCustomPicker(false);
   };
 
-  const handleCustomApply = () => {
+  const handleCustomApply = async () => {
     const start = new Date(customStart);
     const end = new Date(customEnd);
     
     if (start > end) {
-      alert(language === 'tr' ? 'Başlangıç tarihi bitiş tarihinden sonra olamaz!' : 'Start date cannot be after end date!');
+      await showAlert({
+        title: language === 'tr' ? 'Geçersiz Tarih Aralığı' : 'Invalid Date Range',
+        message: language === 'tr' 
+          ? 'Başlangıç tarihi bitiş tarihinden sonra olamaz!'
+          : 'Start date cannot be after end date!',
+        type: 'warning',
+        confirmText: 'OK',
+        showCancel: false,
+      });
       return;
     }
 
@@ -166,6 +176,9 @@ export function DateRangeSelector({ value, onChange, language }: DateRangeSelect
         <Calendar className="w-4 h-4" />
         <span className="font-medium">{formatDateRange()}</span>
       </div>
+
+      {/* Alert Dialog */}
+      {AlertComponent}
     </div>
   );
 }

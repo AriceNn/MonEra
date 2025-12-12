@@ -17,13 +17,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const cloudEnabled = isSupabaseConfigured();
 
   useEffect(() => {
+    console.log('🔐 [AuthContext] Initializing...', { cloudEnabled });
+    
     if (!cloudEnabled) {
+      console.warn('⚠️ [AuthContext] Cloud disabled - skipping auth');
       setIsLoading(false);
       return;
     }
 
     // Check active session
     supabase.auth.getSession().then(({ data: { session } }) => {
+      console.log('✅ [AuthContext] Session loaded:', session?.user?.email || 'No user');
       setUser(session?.user ?? null);
       setIsLoading(false);
     });
@@ -31,7 +35,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Listen for auth changes
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
+    } = supabase.auth.onAuthStateChange((event, session) => {
+      console.log('🔄 [AuthContext] Auth state changed:', event, session?.user?.email || 'No user');
       setUser(session?.user ?? null);
     });
 

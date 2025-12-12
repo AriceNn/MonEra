@@ -380,6 +380,11 @@ function App() {
     setExchangeRates(rates);
   }, []);
 
+  // Log auth state changes for debugging
+  useEffect(() => {
+    console.log('🔍 [App] Auth state:', { isAuthenticated, authLoading, isCloudEnabled });
+  }, [isAuthenticated, authLoading, isCloudEnabled]);
+
   // Show loading skeleton while checking auth
   if (authLoading) {
     return (

@@ -59,7 +59,7 @@ export function MonthSelector({
       <div className="flex items-center gap-4">
         <button
           onClick={handlePrevMonth}
-          className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors"
+          className="p-2 hover:bg-slate-100 dark:hover:bg-slate-700/50 rounded-lg transition-colors"
           aria-label="Previous month"
         >
           <ChevronLeft size={20} className="text-slate-600 dark:text-slate-400" />
@@ -96,7 +96,7 @@ export function MonthSelector({
         </div>
         <button
           onClick={handleNextMonth}
-          className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors"
+          className="p-2 hover:bg-slate-100 dark:hover:bg-slate-700/50 rounded-lg transition-colors"
           aria-label="Next month"
         >
           <ChevronRight size={20} className="text-slate-600 dark:text-slate-400" />

@@ -12,7 +12,7 @@ interface AuthFormProps {
 
 type AuthMode = 'signin' | 'signup' | 'reset';
 
-export function AuthForm({ language: providedLanguage, onSuccess }: AuthFormProps) {
+export function AuthForm({ language: providedLanguage }: AuthFormProps) {
   // Get language from props or localStorage settings
   const getLanguage = (): 'tr' | 'en' => {
     if (providedLanguage) return providedLanguage;
@@ -125,19 +125,31 @@ export function AuthForm({ language: providedLanguage, onSuccess }: AuthFormProp
     setIsLoading(true);
     try {
       if (mode === 'signin') {
-        await signIn(email, password);
-        onSuccess?.();
+        console.log('🔐 [AuthForm] Attempting sign in...');
+        const result = await signIn(email, password);
+        console.log('✅ [AuthForm] Sign in successful!', result);
+        
+        // Wait a moment for session to be fully established
+        await new Promise(resolve => setTimeout(resolve, 500));
+        
+        // Force hard refresh to reload with new auth state
+        console.log('🔄 [AuthForm] Forcing hard refresh...');
+        window.location.reload();
+        
+        // Keep loading state active during reload
+        return;
       } else {
         await signUp(email, password);
         setSuccess(t.signupSuccess);
+        setIsLoading(false);
         setTimeout(() => {
           setMode('signin');
           setSuccess('');
         }, 3000);
       }
     } catch (err: any) {
+      console.error('❌ [AuthForm] Auth error:', err);
       setError(err.message || 'An error occurred');
-    } finally {
       setIsLoading(false);
     }
   };

@@ -73,7 +73,7 @@ export function AppShell({
                       className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-colors ${
                         isActive
                           ? 'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 font-medium'
-                          : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
+                          : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700/50'
                       }`}
                     >
                       <Icon className="w-4 h-4" />
@@ -102,7 +102,7 @@ export function AppShell({
               {/* Currency Toggle */}
               <button
                 onClick={onCurrencyToggle}
-                className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors text-slate-700 dark:text-slate-300"
+                className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700/50 transition-colors text-slate-700 dark:text-slate-300"
                 title={`Switch to ${currency === 'TRY' ? 'USD' : 'TRY'}`}
               >
                 <DollarSign className="w-5 h-5 text-slate-600 dark:text-slate-400" />
@@ -112,7 +112,7 @@ export function AppShell({
               {/* Language Toggle */}
               <button
                 onClick={onLanguageToggle}
-                className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors text-slate-700 dark:text-slate-300"
+                className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700/50 transition-colors text-slate-700 dark:text-slate-300"
                 title="Change Language"
               >
                 <Globe className="w-5 h-5 text-slate-600 dark:text-slate-400" />
@@ -122,7 +122,7 @@ export function AppShell({
               {/* Theme Toggle */}
               <button
                 onClick={onThemeToggle}
-                className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors text-slate-700 dark:text-slate-300"
+                className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700/50 transition-colors text-slate-700 dark:text-slate-300"
                 title={isDark ? 'Light Mode' : 'Dark Mode'}
               >
                 {isDark ? (
@@ -135,7 +135,7 @@ export function AppShell({
               {/* Settings */}
               <button
                 onClick={onSettingsClick}
-                className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors text-slate-700 dark:text-slate-300"
+                className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700/50 transition-colors text-slate-700 dark:text-slate-300"
                 title="Settings"
               >
                 <Settings className="w-5 h-5 text-slate-600 dark:text-slate-400" />
@@ -155,7 +155,7 @@ export function AppShell({
                   className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-colors whitespace-nowrap ${
                     isActive
                       ? 'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 font-medium'
-                      : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
+                      : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700/50'
                   }`}
                 >
                   <Icon className="w-4 h-4" />

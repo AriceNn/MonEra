@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Target, Plus, Trash2, ToggleLeft, ToggleRight } from 'lucide-react';
 import { useFinance } from '../hooks/useFinance';
+import { useAlert } from '../hooks/useAlert';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
 import { Modal } from '../components/ui/Modal';
@@ -21,6 +22,7 @@ interface BudgetPageProps {
 
 export function BudgetPage({ language, currency, selectedMonth, selectedYear }: BudgetPageProps) {
   const { budgets, setBudget, deleteBudget, toggleBudgetActive, getBudgetProgress } = useFinance();
+  const { showAlert, showConfirm, AlertComponent } = useAlert();
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [formData, setFormData] = useState({
     category: EXPENSE_CATEGORIES[0] || '',
@@ -34,7 +36,15 @@ export function BudgetPage({ language, currency, selectedMonth, selectedYear }: 
     // Check if budget already exists for this category
     const exists = budgets.some((b) => b.category === formData.category);
     if (exists) {
-      alert(language === 'tr' ? 'Bu kategori için zaten bir bütçe var!' : 'Budget already exists for this category!');
+      showAlert({
+        title: language === 'tr' ? 'Bütçe Mevcut' : 'Budget Exists',
+        message: language === 'tr' 
+          ? 'Bu kategori için zaten bir bütçe var!'
+          : 'Budget already exists for this category!',
+        type: 'warning',
+        confirmText: 'OK',
+        showCancel: false,
+      });
       return;
     }
 
@@ -55,10 +65,18 @@ export function BudgetPage({ language, currency, selectedMonth, selectedYear }: 
     setIsAddModalOpen(false);
   };
 
-  const handleDelete = (id: string, category: string) => {
-    if (window.confirm(language === 'tr' 
-      ? `${translateCategory(category, language)} için bütçeyi silmek istediğinizden emin misiniz?`
-      : `Are you sure you want to delete the budget for ${translateCategory(category, language)}?`)) {
+  const handleDelete = async (id: string, category: string) => {
+    const confirmed = await showConfirm({
+      title: language === 'tr' ? 'Bütçeyi Sil' : 'Delete Budget',
+      message: language === 'tr'
+        ? `${translateCategory(category, language)} için bütçeyi silmek istediğinizden emin misiniz?`
+        : `Are you sure you want to delete the budget for ${translateCategory(category, language)}?`,
+      type: 'danger',
+      confirmText: language === 'tr' ? 'Sil' : 'Delete',
+      cancelText: language === 'tr' ? 'İptal' : 'Cancel',
+    });
+    
+    if (confirmed) {
       deleteBudget(id);
     }
   };
@@ -107,7 +125,7 @@ export function BudgetPage({ language, currency, selectedMonth, selectedYear }: 
                   <div className="flex items-center gap-2">
                     <button
                       onClick={() => toggleBudgetActive(budget.id)}
-                      className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                      className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700/50 transition-colors"
                       title={budget.isActive ? (language === 'tr' ? 'Devre Dışı Bırak' : 'Disable') : (language === 'tr' ? 'Etkinleştir' : 'Enable')}
                     >
                       {budget.isActive ? (
@@ -190,6 +208,9 @@ export function BudgetPage({ language, currency, selectedMonth, selectedYear }: 
           />
         </div>
       </Modal>
+
+      {/* Alert Dialog */}
+      {AlertComponent}
     </div>
   );
 }

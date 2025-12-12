@@ -1,11 +1,19 @@
 import type { AppSettings } from '../types';
 import { INCOME_CATEGORIES, EXPENSE_CATEGORIES } from '../types';
 
+// Detect system theme preference
+const getSystemTheme = (): 'light' | 'dark' => {
+  if (typeof window !== 'undefined' && window.matchMedia) {
+    return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  }
+  return 'light';
+};
+
 // Default application settings
 export const DEFAULT_APP_SETTINGS: AppSettings = {
   currency: 'TRY',
   language: 'tr',
-  theme: 'light',
+  theme: getSystemTheme(),
   inflationRate: 30.0, // Annual inflation rate estimate for Turkey
   currencyPair: 'TRY-USD',
 };

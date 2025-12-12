@@ -7,6 +7,7 @@ import { useFinance } from '../hooks/useFinance';
 import { useAuth } from '../context/AuthContext';
 import { signOut } from '../lib/supabase';
 import { useDataExportImport } from '../hooks/useDataExportImport';
+import { SyncStatusIndicator } from '../components/sync/SyncStatusIndicator';
 import type { AppSettings } from '../types';
 
 interface SettingsPageProps {
@@ -372,15 +373,15 @@ export function SettingsPage({ isOpen, onClose }: SettingsPageProps) {
         </section>
 
         {/* Cloud Sync Section */}
-        {isCloudEnabled && (
-          <section className="border border-slate-200 dark:border-slate-700 rounded-lg p-4">
-            <h3 className="text-sm font-semibold text-slate-900 dark:text-white mb-4">
-              {settings.language === 'tr' ? 'Bulut Senkronizasyonu' : 'Cloud Sync'}
-            </h3>
+        <section className="border border-slate-200 dark:border-slate-700 rounded-lg p-4">
+          <h3 className="text-sm font-semibold text-slate-900 dark:text-white mb-4">
+            {settings.language === 'tr' ? 'Bulut Senkronizasyonu' : 'Cloud Sync'}
+          </h3>
 
-            <div className="space-y-4">
-              {isAuthenticated ? (
+          <div className="space-y-4">
+            {isCloudEnabled && isAuthenticated ? (
                 <>
+                  {/* User Info */}
                   <div className="flex items-center gap-3 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
                     <Cloud size={18} className="text-blue-600 dark:text-blue-400" />
                     <div className="flex-1">
@@ -393,39 +394,36 @@ export function SettingsPage({ isOpen, onClose }: SettingsPageProps) {
                     </div>
                   </div>
                   
+                  {/* Sync Status Indicator */}
+                  <SyncStatusIndicator />
+                  
+                  {/* Logout Button */}
                   <button
                     onClick={handleLogout}
                     className="w-full px-3 py-2.5 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 hover:bg-red-100 dark:hover:bg-red-900/30 text-red-700 dark:text-red-300 transition-colors text-xs font-medium"
                   >
-                    {settings.language === 'tr' ? 'Çıkış Yap' : 'Sign Out'}
-                  </button>
-                  
-                  <p className="text-xs text-slate-500 dark:text-slate-400">
-                    {settings.language === 'tr' 
-                      ? '💡 Verileriniz otomatik olarak buluta senkronize edilir' 
-                      : '💡 Your data is automatically synced to cloud'}
+                  {settings.language === 'tr' ? 'Çıkış Yap' : 'Sign Out'}
+                </button>
+              </>
+            ) : !isCloudEnabled ? (
+              <div className="flex items-center gap-3 p-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg">
+                <CloudOff size={18} className="text-slate-500 dark:text-slate-400" />
+                <div className="flex-1">
+                  <p className="text-sm font-medium text-slate-900 dark:text-white">
+                    {settings.language === 'tr' ? 'Bulut devre dışı' : 'Cloud disabled'}
                   </p>
-                </>
-              ) : (
-                <div className="flex items-center gap-3 p-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg">
-                  <CloudOff size={18} className="text-slate-500 dark:text-slate-400" />
-                  <div className="flex-1">
-                    <p className="text-sm font-medium text-slate-900 dark:text-white">
-                      {settings.language === 'tr' ? 'Bulut devre dışı' : 'Cloud disabled'}
-                    </p>
-                    <p className="text-xs text-slate-600 dark:text-slate-400">
-                      {settings.language === 'tr' 
-                        ? 'Verileriniz sadece bu cihazda saklanır' 
-                        : 'Your data is stored locally only'}
-                    </p>
-                  </div>
+                  <p className="text-xs text-slate-600 dark:text-slate-400">
+                    {settings.language === 'tr' 
+                      ? 'Verileriniz sadece bu cihazda saklanır' 
+                      : 'Your data is stored locally only'}
+                  </p>
                 </div>
-              )}
-            </div>
-          </section>
-        )}
-
-        {/* Data Management */}
+              </div>
+            ) : (
+              <SyncStatusIndicator />
+            )}
+          </div>
+        </section>        {/* Data Management */}
         <section className="border border-slate-200 dark:border-slate-700 rounded-lg p-4">
           <h3 className="text-sm font-semibold text-slate-900 dark:text-white mb-4">
             {settings.language === 'tr' ? 'Veri Yönetimi' : 'Data Management'}
@@ -540,7 +538,7 @@ export function SettingsPage({ isOpen, onClose }: SettingsPageProps) {
         <div className="flex justify-end gap-2 pt-4 border-t border-slate-200 dark:border-slate-700">
           <button
             onClick={handleCancel}
-            className="px-4 py-2 text-sm font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors"
+            className="px-4 py-2 text-sm font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700/50 rounded-lg transition-colors"
             disabled={isProcessing}
           >
             {settings.language === 'tr' ? 'İptal' : 'Cancel'}

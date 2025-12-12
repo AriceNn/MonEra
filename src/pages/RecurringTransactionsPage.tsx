@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Repeat, Play, Pause, Trash2, Edit2 } from 'lucide-react';
 import { useFinance } from '../hooks/useFinance';
+import { useAlert } from '../hooks/useAlert';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
 import { Modal } from '../components/ui/Modal';
@@ -19,14 +20,25 @@ interface RecurringTransactionsPageProps {
 
 export function RecurringTransactionsPage({ language, currency }: RecurringTransactionsPageProps) {
   const { recurringTransactions, toggleRecurringActive, deleteRecurringTransaction, updateRecurringTransaction } = useFinance();
+  const { showConfirm, AlertComponent } = useAlert();
   const [editingRecurring, setEditingRecurring] = useState<RecurringTransaction | null>(null);
 
   const handleToggleActive = (id: string) => {
     toggleRecurringActive(id);
   };
 
-  const handleDelete = (id: string) => {
-    if (window.confirm(language === 'tr' ? 'Bu tekrarlayan işlemi silmek istediğinizden emin misiniz?' : 'Are you sure you want to delete this recurring transaction?')) {
+  const handleDelete = async (id: string) => {
+    const confirmed = await showConfirm({
+      title: language === 'tr' ? 'Tekrarlayan İşlemi Sil' : 'Delete Recurring Transaction',
+      message: language === 'tr'
+        ? 'Bu tekrarlayan işlemi silmek istediğinizden emin misiniz? Bu işlem geri alınamaz.'
+        : 'Are you sure you want to delete this recurring transaction? This action cannot be undone.',
+      type: 'danger',
+      confirmText: language === 'tr' ? 'Sil' : 'Delete',
+      cancelText: language === 'tr' ? 'İptal' : 'Cancel',
+    });
+    
+    if (confirmed) {
       deleteRecurringTransaction(id);
     }
   };
@@ -44,20 +56,26 @@ export function RecurringTransactionsPage({ language, currency }: RecurringTrans
 
   if (recurringTransactions.length === 0) {
     return (
-      <div className="max-w-6xl mx-auto p-6 space-y-6">
-        <div className="flex items-center gap-3">
-          <Repeat className="w-8 h-8 text-indigo-600 dark:text-indigo-400" />
-          <h1 className="text-3xl font-bold text-slate-900 dark:text-white">
-            {t('recurringTransactions', language)}
-          </h1>
-        </div>
+      <>
+        <div className="max-w-6xl mx-auto p-6 space-y-6">
+          <div className="flex items-center gap-3">
+            <Repeat className="w-8 h-8 text-indigo-600 dark:text-indigo-400" />
+            <h1 className="text-3xl font-bold text-slate-900 dark:text-white">
+              {t('recurringTransactions', language)}
+            </h1>
+          </div>
 
-        <NoRecurringEmpty language={language} />
-      </div>
+          <NoRecurringEmpty language={language} />
+        </div>
+        
+        {/* Alert Dialog */}
+        {AlertComponent}
+      </>
     );
   }
 
   return (
+    <>
     <div className="max-w-6xl mx-auto p-6">
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-3">
@@ -191,7 +209,11 @@ export function RecurringTransactionsPage({ language, currency }: RecurringTrans
           }}
         />
       )}
+
+      {/* Alert Dialog */}
+      {AlertComponent}
     </div>
+    </>
   );
 }
 
