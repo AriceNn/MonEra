@@ -11,19 +11,57 @@ import { TransactionForm } from './components/transactions/TransactionForm';
 import { SettingsPage } from './pages/SettingsPage';
 import { RecurringTransactionsPage } from './pages/RecurringTransactionsPage';
 import { BudgetPage } from './pages/BudgetPage';
+import { TransactionsPage } from './pages/TransactionsPage';
+import { NotificationSettingsPanel } from './components/notifications/NotificationSettingsPanel';
 import { generateFinancialSummary } from './utils/calculations';
 import { convertCurrency, fetchLatestRates, updateExchangeRates, loadPersistedRates } from './utils/exchange';
 import './index.css';
+
+// Load test utilities in development
+if (import.meta.env.DEV) {
+  import('./db/testMigration').then(module => {
+    (window as any).FinTrackTest = {
+      generateMockData: module.generateMockData,
+      testMigration: module.testMigration,
+      benchmarkPerformance: module.benchmarkPerformance,
+      testRollback: module.testRollback,
+      runAllTests: module.runAllTests
+    };
+    console.log('🧪 FinTrack Test Suite Loaded');
+    console.log('Available commands:');
+    console.log('  FinTrackTest.generateMockData(1000) - Generate 1000 mock transactions');
+    console.log('  FinTrackTest.testMigration() - Test localStorage → IndexedDB migration');
+    console.log('  FinTrackTest.benchmarkPerformance() - Compare query performance');
+    console.log('  FinTrackTest.testRollback() - Test IndexedDB → localStorage rollback');
+    console.log('  FinTrackTest.runAllTests() - Run complete test suite');
+  });
+}
 
 interface DashboardContentProps {
   onRatesUpdate: (rates: Record<string, number>) => void;
 }
 
 function DashboardContent({ onRatesUpdate }: DashboardContentProps) {
-  const { transactions, settings, addTransaction, deleteTransaction, updateTransaction, updateSettings, generateRecurringTransactions } = useFinance();
+  const { 
+    transactions, 
+    settings, 
+    addTransaction, 
+    deleteTransaction, 
+    updateTransaction, 
+    updateSettings, 
+    generateRecurringTransactions,
+    notifications,
+    notificationSettings,
+    updateNotificationSettings,
+    markNotificationAsRead,
+    markAllNotificationsAsRead,
+    deleteNotification,
+    clearAllNotifications
+  } = useFinance();
   const [editingTransaction, setEditingTransaction] = useState<Transaction | undefined>(undefined);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-  const [currentPage, setCurrentPage] = useState<'dashboard' | 'recurring' | 'budget' | 'settings'>('dashboard');
+  const [isNotificationSettingsOpen, setIsNotificationSettingsOpen] = useState(false);
+  const [currentPage, setCurrentPage] = useState<'dashboard' | 'transactions' | 'recurring' | 'budget' | 'settings'>('dashboard');
   
   const currentDate = new Date();
   const [selectedMonth, setSelectedMonth] = useState(currentDate.getMonth());
@@ -122,19 +160,13 @@ function DashboardContent({ onRatesUpdate }: DashboardContentProps) {
     return monthlySummary;
   }, [filteredTransactions, selectedMonth, selectedYear, getDisplayAmount, cumulativeWealth]);
 
-  // State to trigger re-render when rates are loaded
-  const [ratesLoaded, setRatesLoaded] = useState(false);
-
   // Fetch latest rates on initial mount and when currency changes
   useEffect(() => {
     let cancelled = false;
     
     const fetchRates = async () => {
       // First, load any cached rates immediately for instant display
-      const cached = loadPersistedRates();
-      if (cached) {
-        setRatesLoaded(true);
-      }
+      loadPersistedRates();
       
       // Then fetch fresh rates from API
       const base = settings.currency || 'USD';
@@ -143,54 +175,12 @@ function DashboardContent({ onRatesUpdate }: DashboardContentProps) {
       if (!cancelled) {
         updateExchangeRates(rates);
         onRatesUpdate(rates); // Update parent state
-        setRatesLoaded(true); // Trigger re-render with fresh data
       }
     };
     
     fetchRates();
     return () => { cancelled = true; };
   }, [settings.currency]);
-
-  // Get current exchange rate for display based on selected currency pair
-  const currentRate = useMemo(() => {
-    if (!ratesLoaded) return undefined; // Wait for rates to load
-    
-    try {
-      const stored = window.localStorage.getItem('fintrack_exchange_rates');
-      if (!stored) return undefined;
-      const data = JSON.parse(stored);
-      
-      const pair = settings.currencyPair || 'TRY-USD';
-      const [base, quote] = pair.split('-') as [string, string];
-      
-      console.log('[currentRate] Currency pair:', pair, 'Base:', base, 'Quote:', quote);
-      console.log('[currentRate] Stored rates:', data.rates);
-      
-      const baseRate = data.rates?.[base] || 1;
-      const quoteRate = data.rates?.[quote] || 1;
-      
-      // Calculate: 1 BASE = ? QUOTE
-      const rate = quoteRate / baseRate;
-      
-      console.log('[currentRate] Rate:', `1 ${base} = ${rate} ${quote}`);
-      return { rate, base, quote };
-    } catch (err) {
-      console.error('[currentRate] Error:', err);
-      return undefined;
-    }
-  }, [settings.currency, settings.currencyPair, ratesLoaded]);
-
-  const ratesUpdatedAt = useMemo(() => {
-    if (!ratesLoaded) return undefined; // Wait for rates to load
-    
-    try {
-      const stored = window.localStorage.getItem('fintrack_exchange_rates');
-      if (!stored) return undefined;
-      return JSON.parse(stored).updatedAt;
-    } catch {
-      return undefined;
-    }
-  }, [settings.currency, ratesLoaded]); // Re-calculate when currency changes (rates are fetched)
 
   return (
     <AppShell
@@ -203,8 +193,12 @@ function DashboardContent({ onRatesUpdate }: DashboardContentProps) {
       onLanguageToggle={handleLanguageToggle}
       onCurrencyToggle={handleCurrencyToggle}
       onSettingsClick={() => setIsSettingsOpen(true)}
-      ratesUpdatedAt={ratesUpdatedAt}
-      currentRate={currentRate}
+      notifications={notifications}
+      onMarkNotificationAsRead={markNotificationAsRead}
+      onMarkAllNotificationsAsRead={markAllNotificationsAsRead}
+      onDeleteNotification={deleteNotification}
+      onClearAllNotifications={clearAllNotifications}
+      onOpenNotificationSettings={() => setIsNotificationSettingsOpen(true)}
     >
       {/* Dashboard Page */}
       {currentPage === 'dashboard' && (
@@ -261,6 +255,16 @@ function DashboardContent({ onRatesUpdate }: DashboardContentProps) {
         </div>
       )}
 
+      {/* Transactions Page */}
+      {currentPage === 'transactions' && (
+        <TransactionsPage
+          language={settings.language}
+          currency={settings.currency}
+          selectedMonth={selectedMonth}
+          selectedYear={selectedYear}
+        />
+      )}
+
       {/* Recurring Transactions Page */}
       {currentPage === 'recurring' && (
         <RecurringTransactionsPage
@@ -281,6 +285,16 @@ function DashboardContent({ onRatesUpdate }: DashboardContentProps) {
 
       {/* Settings Modal */}
       <SettingsPage isOpen={isSettingsOpen || currentPage === 'settings'} onClose={() => { setIsSettingsOpen(false); setCurrentPage('dashboard'); }} />
+
+      {/* Notification Settings Modal */}
+      {isNotificationSettingsOpen && (
+        <NotificationSettingsPanel
+          settings={notificationSettings}
+          language={settings.language}
+          onUpdate={updateNotificationSettings}
+          onClose={() => setIsNotificationSettingsOpen(false)}
+        />
+      )}
     </AppShell>
   );
 }

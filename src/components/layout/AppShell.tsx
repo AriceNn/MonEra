@@ -1,19 +1,26 @@
-import { Settings, Moon, Sun, Globe, DollarSign, LayoutDashboard, Repeat, Target } from 'lucide-react';
+import { Settings, Moon, Sun, Globe, DollarSign, LayoutDashboard, Repeat, Target, List } from 'lucide-react';
 import type { ReactNode } from 'react';
+import { NotificationCenter } from '../notifications/NotificationCenter';
+import type { Notification } from '../../utils/notifications';
 
 interface AppShellProps {
   children: ReactNode;
   theme: 'light' | 'dark';
   language: 'tr' | 'en';
   currency: 'TRY' | 'USD' | 'EUR' | 'GBP';
-  currentPage?: 'dashboard' | 'recurring' | 'budget' | 'settings';
-  onNavigate?: (page: 'dashboard' | 'recurring' | 'budget' | 'settings') => void;
+  currentPage?: 'dashboard' | 'transactions' | 'recurring' | 'budget' | 'settings';
+  onNavigate?: (page: 'dashboard' | 'transactions' | 'recurring' | 'budget' | 'settings') => void;
   onThemeToggle: () => void;
   onLanguageToggle: () => void;
   onCurrencyToggle?: () => void;
   onSettingsClick?: () => void;
-  ratesUpdatedAt?: string;
-  currentRate?: { rate: number; base: string; quote: string };
+  // Notifications
+  notifications?: Notification[];
+  onMarkNotificationAsRead?: (id: string) => void;
+  onMarkAllNotificationsAsRead?: () => void;
+  onDeleteNotification?: (id: string) => void;
+  onClearAllNotifications?: () => void;
+  onOpenNotificationSettings?: () => void;
 }
 
 export function AppShell({
@@ -27,23 +34,19 @@ export function AppShell({
   onLanguageToggle,
   onCurrencyToggle,
   onSettingsClick,
-  ratesUpdatedAt,
-  currentRate,
+  notifications = [],
+  onMarkNotificationAsRead,
+  onMarkAllNotificationsAsRead,
+  onDeleteNotification,
+  onClearAllNotifications,
+  onOpenNotificationSettings,
 }: AppShellProps) {
   const isDark = theme === 'dark';
-  
-  const formatTime = (dateStr?: string) => {
-    if (!dateStr) return '';
-    const date = new Date(dateStr);
-    return date.toLocaleTimeString(language === 'tr' ? 'tr-TR' : 'en-US', { 
-      hour: '2-digit', 
-      minute: '2-digit' 
-    });
-  };
 
   const navItems = [
     { id: 'dashboard' as const, label: language === 'tr' ? 'Panel' : 'Dashboard', icon: LayoutDashboard },
-    { id: 'recurring' as const, label: language === 'tr' ? 'Tekrarlayan İşlemler' : 'Recurring Transactions', icon: Repeat },
+    { id: 'transactions' as const, label: language === 'tr' ? 'İşlemler' : 'Transactions', icon: List },
+    { id: 'recurring' as const, label: language === 'tr' ? 'Tekrarlayan' : 'Recurring', icon: Repeat },
     { id: 'budget' as const, label: language === 'tr' ? 'Bütçe' : 'Budget', icon: Target },
   ];
 
@@ -82,6 +85,19 @@ export function AppShell({
 
             {/* Right-side Controls */}
             <div className="flex items-center gap-1">
+              {/* Notification Center */}
+              {onMarkNotificationAsRead && onMarkAllNotificationsAsRead && onDeleteNotification && onClearAllNotifications && onOpenNotificationSettings && (
+                <NotificationCenter
+                  notifications={notifications}
+                  language={language}
+                  onMarkAsRead={onMarkNotificationAsRead}
+                  onMarkAllAsRead={onMarkAllNotificationsAsRead}
+                  onDelete={onDeleteNotification}
+                  onClearAll={onClearAllNotifications}
+                  onOpenSettings={onOpenNotificationSettings}
+                />
+              )}
+
               {/* Currency Toggle */}
               <button
                 onClick={onCurrencyToggle}
@@ -123,18 +139,6 @@ export function AppShell({
               >
                 <Settings className="w-5 h-5 text-slate-600 dark:text-slate-400" />
               </button>
-
-              {/* Rates Info Chip - Hidden on mobile */}
-              {ratesUpdatedAt && (
-                <span className="hidden md:inline-block ml-2 px-3 py-1.5 text-xs rounded-md bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300 font-medium">
-                  {language === 'tr' ? 'Güncelleme: ' : 'Updated: '}{formatTime(ratesUpdatedAt)}
-                  {currentRate && (
-                    <span className="ml-2 opacity-90">
-                      (1 {currentRate.base} = {currentRate.rate.toFixed(2)} {currentRate.quote})
-                    </span>
-                  )}
-                </span>
-              )}
             </div>
           </header>
 
