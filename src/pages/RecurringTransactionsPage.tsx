@@ -10,6 +10,7 @@ import { t, translateCategory } from '../utils/i18n';
 import { formatCurrency, formatDate } from '../utils/formatters';
 import { INCOME_CATEGORIES, EXPENSE_CATEGORIES, SAVINGS_CATEGORIES } from '../types';
 import type { RecurringTransaction } from '../types';
+import { NoRecurringEmpty } from '../components/ui/EmptyState';
 
 interface RecurringTransactionsPageProps {
   language: 'tr' | 'en';
@@ -43,24 +44,15 @@ export function RecurringTransactionsPage({ language, currency }: RecurringTrans
 
   if (recurringTransactions.length === 0) {
     return (
-      <div className="max-w-6xl mx-auto p-6">
-        <div className="flex items-center gap-3 mb-6">
+      <div className="max-w-6xl mx-auto p-6 space-y-6">
+        <div className="flex items-center gap-3">
           <Repeat className="w-8 h-8 text-indigo-600 dark:text-indigo-400" />
           <h1 className="text-3xl font-bold text-slate-900 dark:text-white">
             {t('recurringTransactions', language)}
           </h1>
         </div>
 
-        <Card>
-          <div className="text-center py-12">
-            <Repeat className="w-16 h-16 mx-auto mb-4 text-slate-300 dark:text-slate-600" />
-            <p className="text-slate-500 dark:text-slate-400">
-              {language === 'tr' 
-                ? 'Henüz tekrarlayan işlem yok. İşlem eklerken "Tekrarlayan Yap" seçeneğini işaretleyin.'
-                : 'No recurring transactions yet. Check "Make Recurring" when adding a transaction.'}
-            </p>
-          </div>
-        </Card>
+        <NoRecurringEmpty language={language} />
       </div>
     );
   }

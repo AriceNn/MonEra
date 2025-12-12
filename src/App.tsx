@@ -14,6 +14,8 @@ import { BudgetPage } from './pages/BudgetPage';
 import { TransactionsPage } from './pages/TransactionsPage';
 import { AnalyticsPage } from './pages/AnalyticsPage';
 import { NotificationSettingsPanel } from './components/notifications/NotificationSettingsPanel';
+import { SkeletonDashboard } from './components/ui/Skeleton';
+import { NoTransactionsEmpty } from './components/ui/EmptyState';
 import { generateFinancialSummary } from './utils/calculations';
 import { convertCurrency, fetchLatestRates, updateExchangeRates, loadPersistedRates } from './utils/exchange';
 import './index.css';
@@ -63,10 +65,19 @@ function DashboardContent({ onRatesUpdate }: DashboardContentProps) {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isNotificationSettingsOpen, setIsNotificationSettingsOpen] = useState(false);
   const [currentPage, setCurrentPage] = useState<'dashboard' | 'transactions' | 'recurring' | 'budget' | 'analytics' | 'settings'>('dashboard');
+  const [isLoading, setIsLoading] = useState(true);
   
   const currentDate = new Date();
   const [selectedMonth, setSelectedMonth] = useState(currentDate.getMonth());
   const [selectedYear, setSelectedYear] = useState(currentDate.getFullYear());
+
+  // Simulate initial loading (remove in production or use real async operations)
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setIsLoading(false);
+    }, 800); // 800ms loading simulation
+    return () => clearTimeout(timer);
+  }, []);
 
   // Auto-generate recurring transactions on mount
   useEffect(() => {
@@ -208,32 +219,60 @@ function DashboardContent({ onRatesUpdate }: DashboardContentProps) {
             <h1 className="text-2xl md:text-3xl font-bold text-slate-900 dark:text-white">
               {settings.language === 'tr' ? 'Panel' : 'Dashboard'}
             </h1>
-            <TransactionForm mode="add" onSubmit={handleAddTransaction} language={settings.language} currency={settings.currency} />
+            {/* Hide add button when there are no transactions (empty state has its own button) */}
+            {!isLoading && transactions.length > 0 && (
+              <TransactionForm mode="add" onSubmit={handleAddTransaction} language={settings.language} currency={settings.currency} />
+            )}
           </div>
 
-          <MonthSelector
-            selectedMonth={selectedMonth}
-            selectedYear={selectedYear}
-            onMonthChange={handleMonthChange}
-            language={settings.language}
-          />
+          {isLoading ? (
+            <SkeletonDashboard />
+          ) : transactions.length === 0 ? (
+            <>
+              {/* Hidden TransactionForm to be triggered by empty state button */}
+              <TransactionForm 
+                mode="add" 
+                onSubmit={handleAddTransaction} 
+                language={settings.language} 
+                currency={settings.currency}
+                triggerButton={false}
+              />
+              <NoTransactionsEmpty
+                onAdd={() => {
+                  // Trigger the hidden transaction form modal
+                  const button = document.querySelector<HTMLButtonElement>('[data-transaction-form-trigger]');
+                  if (button) button.click();
+                }}
+                language={settings.language}
+              />
+            </>
+          ) : (
+            <>
+              <MonthSelector
+                selectedMonth={selectedMonth}
+                selectedYear={selectedYear}
+                onMonthChange={handleMonthChange}
+                language={settings.language}
+              />
 
-          <SummaryCards
-            summary={summary}
-            currency={settings.currency}
-            language={settings.language}
-            cumulativeWealth={cumulativeWealth}
-          />
+              <SummaryCards
+                summary={summary}
+                currency={settings.currency}
+                language={settings.language}
+                cumulativeWealth={cumulativeWealth}
+              />
 
-          <Charts transactions={transactions} currency={settings.currency} language={settings.language} theme={settings.theme} selectedMonth={selectedMonth} selectedYear={selectedYear} />
+              <Charts transactions={transactions} currency={settings.currency} language={settings.language} theme={settings.theme} selectedMonth={selectedMonth} selectedYear={selectedYear} />
 
-          <RecentTransactions
-            transactions={filteredTransactions}
-            currency={settings.currency}
-            language={settings.language}
-            onDelete={deleteTransaction}
-            onEdit={(transaction) => setEditingTransaction(transaction)}
-          />
+              <RecentTransactions
+                transactions={filteredTransactions}
+                currency={settings.currency}
+                language={settings.language}
+                onDelete={deleteTransaction}
+                onEdit={(transaction) => setEditingTransaction(transaction)}
+              />
+            </>
+          )}
 
           {/* Edit Transaction Modal */}
           {editingTransaction && (

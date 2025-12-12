@@ -7,6 +7,7 @@ import { formatCurrency } from '../utils/formatters';
 import { t, translateCategory } from '../utils/i18n';
 import { Pencil, Trash2, Search, Filter, X } from 'lucide-react';
 import { convertCurrency } from '../utils/exchange';
+import { NoSearchResultsEmpty } from '../components/ui/EmptyState';
 
 interface TransactionsPageProps {
   language: 'tr' | 'en';
@@ -255,9 +256,10 @@ export function TransactionsPage({ language, currency }: TransactionsPageProps) 
 
       {/* Transactions List */}
       {filteredTransactions.length === 0 ? (
-        <Card className="p-8 text-center text-slate-500 dark:text-slate-400">
-          {language === 'tr' ? 'İşlem bulunamadı.' : 'No transactions found.'}
-        </Card>
+        <NoSearchResultsEmpty
+          onClear={hasActiveFilters ? clearFilters : undefined}
+          language={language}
+        />
       ) : (
         <>
           {/* Desktop/Tablet Table View */}

@@ -8,6 +8,7 @@ import { Card } from '../components/ui/Card';
 import { DateRangeSelector, type DateRange } from '../components/analytics/DateRangeSelector';
 import { Button } from '../components/ui/Button';
 import { exportTransactionsCSV, exportMonthlyBreakdownCSV, exportCategoryBreakdownCSV, exportAnalyticsSummaryCSV } from '../utils/export';
+import { NoAnalyticsDataEmpty } from '../components/ui/EmptyState';
 
 interface AnalyticsPageProps {
   transactions: Transaction[];
@@ -292,6 +293,11 @@ export function AnalyticsPage({ transactions, language, currency, getDisplayAmou
         />
       </Card>
 
+      {/* Empty State */}
+      {filteredTransactions.length === 0 ? (
+        <NoAnalyticsDataEmpty language={language} />
+      ) : (
+        <>
       {/* Insight Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Total Income */}
@@ -538,6 +544,8 @@ export function AnalyticsPage({ transactions, language, currency, getDisplayAmou
           </Card>
         )}
       </div>
+      </>
+      )}
     </div>
   );
 }

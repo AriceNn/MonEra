@@ -10,6 +10,7 @@ import { BudgetProgressBar } from '../components/budget/BudgetProgressBar';
 import { translateCategory } from '../utils/i18n';
 import { formatCurrency } from '../utils/formatters';
 import { EXPENSE_CATEGORIES } from '../types';
+import { NoBudgetsEmpty } from '../components/ui/EmptyState';
 
 interface BudgetPageProps {
   language: 'tr' | 'en';
@@ -83,16 +84,10 @@ export function BudgetPage({ language, currency, selectedMonth, selectedYear }: 
       </div>
 
       {budgets.length === 0 ? (
-        <Card>
-          <div className="text-center py-12">
-            <Target className="w-16 h-16 mx-auto mb-4 text-slate-300 dark:text-slate-600" />
-            <p className="text-slate-500 dark:text-slate-400">
-              {language === 'tr' 
-                ? 'Henüz bütçe yok. Kategoriler için aylık harcama limitleri belirleyerek başlayın!'
-                : 'No budgets yet. Start by setting monthly spending limits for categories!'}
-            </p>
-          </div>
-        </Card>
+        <NoBudgetsEmpty
+          onAdd={() => setIsAddModalOpen(true)}
+          language={language}
+        />
       ) : (
         <div className="space-y-4">
           {budgets.map((budget) => {

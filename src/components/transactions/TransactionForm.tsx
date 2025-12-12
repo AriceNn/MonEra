@@ -214,10 +214,23 @@ export function TransactionForm({
   return (
     <>
       {triggerButton && mode === 'add' && (
-        <Button onClick={() => setIsModalOpen(true)} className="gap-2">
+        <Button 
+          onClick={() => setIsModalOpen(true)} 
+          className="gap-2"
+          data-transaction-form-trigger="true"
+        >
           <Plus size={20} />
           {t('addTransaction', language)}
         </Button>
+      )}
+      {/* Even when button is hidden, allow external trigger */}
+      {!triggerButton && mode === 'add' && (
+        <button
+          onClick={() => setIsModalOpen(true)}
+          data-transaction-form-trigger="true"
+          style={{ display: 'none' }}
+          aria-hidden="true"
+        />
       )}
 
       <Modal
