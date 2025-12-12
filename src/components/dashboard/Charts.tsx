@@ -4,6 +4,7 @@ import type { Transaction } from '../../types';
 import { Card } from '../ui/Card';
 import { formatCurrency } from '../../utils/formatters';
 import { t } from '../../utils/i18n';
+import { convertCurrency } from '../../utils/exchange';
 
 interface ChartsProps {
   transactions: Transaction[];
@@ -33,6 +34,23 @@ const TOOLTIP_STYLE = {
 };
 
 export function Charts({ transactions, currency, language, selectedMonth = 0, selectedYear = 2024 }: ChartsProps) {
+  // Custom bar label that formats to currency (2 decimals)
+  const renderBarLabel = (props: any) => {
+    const { x, y, value, width } = props;
+    const cx = x + (width || 0) / 2;
+    return (
+      <text
+        x={cx}
+        y={(y || 0) - 4}
+        fill="#64748b"
+        fontSize={10}
+        style={{ fontWeight: 600 }}
+        textAnchor="middle"
+      >
+        {formatCurrency(Number(value || 0), currency as any)}
+      </text>
+    );
+  };
   // Calculate monthly data - all months
   const { monthlyList, monthlyMap } = useMemo(() => {
     const dataByMonth: Record<string, { income: number; expense: number; savings: number; month: string }> = {};
@@ -40,6 +58,8 @@ export function Charts({ transactions, currency, language, selectedMonth = 0, se
     transactions.forEach((t) => {
       const date = new Date(t.date);
       const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+      const from = (t as any).originalCurrency || 'TRY';
+      const amt = from === currency ? t.amount : convertCurrency(t.amount, from, currency);
       
       if (!dataByMonth[monthKey]) {
         dataByMonth[monthKey] = { 
@@ -51,13 +71,13 @@ export function Charts({ transactions, currency, language, selectedMonth = 0, se
       }
       
       if (t.type === 'income') {
-        dataByMonth[monthKey].income += t.amount;
+        dataByMonth[monthKey].income += amt;
       } else if (t.type === 'expense') {
-        dataByMonth[monthKey].expense += t.amount;
+        dataByMonth[monthKey].expense += amt;
       } else if (t.type === 'savings') {
-        dataByMonth[monthKey].savings += t.amount;
+        dataByMonth[monthKey].savings += amt;
       } else if (t.type === 'withdrawal') {
-        dataByMonth[monthKey].savings -= t.amount;
+        dataByMonth[monthKey].savings -= amt;
       }
     });
 
@@ -66,7 +86,7 @@ export function Charts({ transactions, currency, language, selectedMonth = 0, se
       .map(([_, data]) => data);
 
     return { monthlyList, monthlyMap: dataByMonth };
-  }, [transactions]);
+  }, [transactions, currency]);
   
   // Get only selected month data for cash flow and pie chart
   const selectedMonthData = useMemo(() => {
@@ -166,9 +186,9 @@ export function Charts({ transactions, currency, language, selectedMonth = 0, se
               formatter={(value: number) => formatCurrency(value, currency as any)}
             />
             <Legend wrapperStyle={{ fontSize: '11px', paddingTop: '8px', color: '#64748b', fontWeight: 600 }} />
-            <Bar dataKey="income" fill={COLORS.income} name={language === 'tr' ? 'Gelir' : 'Income'} radius={[4, 4, 0, 0]} barSize={20} isAnimationActive={false} label={{ position: 'top', fill: '#64748b', fontSize: 10, fontWeight: 600 }} />
-            <Bar dataKey="expense" fill={COLORS.expense} name={language === 'tr' ? 'Gider' : 'Expense'} radius={[4, 4, 0, 0]} barSize={20} isAnimationActive={false} label={{ position: 'top', fill: '#64748b', fontSize: 10, fontWeight: 600 }} />
-            <Bar dataKey="savings" fill={COLORS.savings} name={language === 'tr' ? 'Tasarruf' : 'Savings'} radius={[4, 4, 0, 0]} barSize={20} isAnimationActive={false} label={{ position: 'top', fill: '#64748b', fontSize: 10, fontWeight: 600 }} />
+            <Bar dataKey="income" fill={COLORS.income} name={language === 'tr' ? 'Gelir' : 'Income'} radius={[4, 4, 0, 0]} barSize={20} isAnimationActive={false} label={{ content: renderBarLabel }} />
+            <Bar dataKey="expense" fill={COLORS.expense} name={language === 'tr' ? 'Gider' : 'Expense'} radius={[4, 4, 0, 0]} barSize={20} isAnimationActive={false} label={{ content: renderBarLabel }} />
+            <Bar dataKey="savings" fill={COLORS.savings} name={language === 'tr' ? 'Tasarruf' : 'Savings'} radius={[4, 4, 0, 0]} barSize={20} isAnimationActive={false} label={{ content: renderBarLabel }} />
           </ComposedChart>
         </ResponsiveContainer>
       </Card>
@@ -216,7 +236,7 @@ export function Charts({ transactions, currency, language, selectedMonth = 0, se
                 <text 
                   x={x} 
                   y={y} 
-                  fill="#1f2937" 
+                  fill="#0f172a"
                   textAnchor={x > cx ? 'start' : 'end'} 
                   dominantBaseline="central"
                   className="text-xs font-medium dark:fill-white"

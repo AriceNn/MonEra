@@ -3,6 +3,7 @@ import { Badge } from '../ui/Badge';
 import { Trash2, Edit2 } from 'lucide-react';
 import { formatCurrency, formatDateShort } from '../../utils/formatters';
 import { t } from '../../utils/i18n';
+import { convertCurrency } from '../../utils/exchange';
 import type { Transaction } from '../../types';
 
 interface RecentTransactionsProps {
@@ -36,7 +37,12 @@ export function RecentTransactions({
     <Card className="p-4">
       <h3 className="text-base font-semibold text-slate-900 dark:text-white mb-4">{language === 'tr' ? 'Son İşlemler' : 'Recent Transactions'}</h3>
       <div className="space-y-3">
-        {recent.map((transaction) => (
+        {recent.map((transaction) => {
+          const originalCurrency = ((transaction as any).originalCurrency as string | undefined) || 'TRY';
+          const amountDisplay = originalCurrency !== currency
+            ? convertCurrency(transaction.amount, originalCurrency, currency)
+            : transaction.amount;
+          return (
           <div
             key={transaction.id}
             className="flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-800 rounded-lg"
@@ -70,7 +76,7 @@ export function RecentTransactions({
                   'text-rose-600 dark:text-rose-400'
                 }`}>
                   {transaction.type === 'income' ? '+' : '-'}
-                  {formatCurrency(transaction.amount, currency as any)}
+                  {formatCurrency(amountDisplay, currency as any)}
                 </p>
                 <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
                   {transaction.type === 'income' ? (language === 'tr' ? 'Gelir' : 'Income') :
@@ -99,7 +105,7 @@ export function RecentTransactions({
               </div>
             </div>
           </div>
-        ))}
+        )})}
       </div>
     </Card>
   );

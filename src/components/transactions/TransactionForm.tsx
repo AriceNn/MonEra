@@ -16,6 +16,7 @@ interface TransactionFormProps {
   onClose?: () => void;
   triggerButton?: boolean;
   language: 'tr' | 'en';
+  currency: 'TRY' | 'USD' | 'EUR' | 'GBP';
 }
 
 export function TransactionForm({ 
@@ -24,7 +25,8 @@ export function TransactionForm({
   onSubmit, 
   onClose,
   triggerButton = true,
-  language
+  language,
+  currency
 }: TransactionFormProps) {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [formData, setFormData] = useState<{
@@ -97,6 +99,7 @@ export function TransactionForm({
       category: formData.category,
       date: formData.date,
       description: formData.description || undefined,
+      originalCurrency: currency,
     });
 
     if (result === false) {

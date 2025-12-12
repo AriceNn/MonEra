@@ -11,6 +11,7 @@ export interface Transaction {
   type: TransactionType;
   description?: string; // Optional description
   isRecurring?: boolean; // Prepared for P2
+  originalCurrency: 'TRY' | 'USD' | 'EUR' | 'GBP'; // Currency when transaction was created
 }
 
 // Global Application Settings
@@ -29,6 +30,26 @@ export interface FinancialSummary {
   cashBalance: number;
   netWorth: number;
   savingsRate: number; // Percentage (e.g., 25.5)
+}
+
+// P1: Filter & Export Data Models
+export interface FilterCriteria {
+  startDate?: string;     // ISO format YYYY-MM-DD
+  endDate?: string;       // ISO format YYYY-MM-DD
+  category?: string;      // Optional category filter
+  type?: TransactionType; // Optional transaction type filter
+}
+
+export interface CategoryExpenseData {
+  category: string;
+  amount: number;
+  percentage: number;
+}
+
+export interface ExportedData {
+  transactions: Transaction[];
+  settings: AppSettings;
+  exportedAt: string; // ISO timestamp
 }
 
 // Default Settings

@@ -13,7 +13,7 @@ interface SummaryCardsProps {
 
 export function SummaryCards({ summary, currency, language, cumulativeWealth = summary.netWorth }: SummaryCardsProps) {
   return (
-    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-6">
+    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 mb-6">
       {/* Total Income Card */}
       <Card className="p-4">
         <div className="flex items-start justify-between gap-2">
@@ -65,21 +65,6 @@ export function SummaryCards({ summary, currency, language, cumulativeWealth = s
         </div>
       </Card>
 
-      {/* Monthly Savings Card */}
-      <Card className="p-4">
-        <div className="flex items-start justify-between gap-2">
-          <div className="flex-1 min-w-0">
-            <p className="text-xs font-medium text-slate-500 dark:text-slate-400 truncate">{language === 'tr' ? 'Aylık Tasarruf' : 'Monthly Savings'}</p>
-            <p className="text-base md:text-lg font-bold text-purple-600 dark:text-purple-400 mt-1 truncate">
-              {formatCurrency(summary.totalSavings, currency as any)}
-            </p>
-          </div>
-          <div className="p-1.5 bg-purple-100 dark:bg-purple-900/30 rounded-md flex-shrink-0">
-            <Target className="text-purple-600 dark:text-purple-400" size={16} />
-          </div>
-        </div>
-      </Card>
-
       {/* Savings Rate Card */}
       <Card className="p-4">
         <div className="flex items-start justify-between gap-2">
@@ -97,7 +82,7 @@ export function SummaryCards({ summary, currency, language, cumulativeWealth = s
         </div>
       </Card>
 
-      {/* Net Worth Card - MOVED TO END */}
+      {/* Net Worth Card */}
       <Card className="p-4">
         <div className="flex items-start justify-between gap-2">
           <div className="flex-1 min-w-0">

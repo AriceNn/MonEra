@@ -91,6 +91,36 @@ export const translations = {
     'Retirement': 'Emeklilik',
     'Goal Savings': 'Hedef Tasarruf',
     'Other Savings': 'Diğer Tasarruf',
+    
+    // P1: Settings & Inflation
+    realWealth: 'Gerçek Servet',
+    inflationRate: 'Enflasyon Oranı (%)',
+    inflationRateDesc: 'Yıllık enflasyon tahmini (reçel hesaplama için)',
+    currency: 'Para Birimi',
+    language: 'Dil',
+    theme: 'Tema',
+    light: 'Açık',
+    dark: 'Koyu',
+    
+    // P1: Export/Import
+    export: 'Dışa Aktar',
+    import: 'İçe Aktar',
+    exportJSON: 'JSON İndir',
+    importJSON: 'JSON Yükle',
+    importCSV: 'CSV Yükle',
+    selectFile: 'Dosya Seç',
+    exportSuccess: 'Veriler başarıyla dışa aktarıldı!',
+    importSuccess: 'Veriler başarıyla içe aktarıldı!',
+    importError: 'Dosya yükleme başarısız. Lütfen geçerli bir dosya seçin.',
+    
+    // P1: Charts & Reports
+    categoryExpenses: 'Kategori Bazında Harcamalar',
+    adjustedWealth: 'Enflasyona Göre Düzeltilmiş Servet',
+    dateRange: 'Tarih Aralığı',
+    startDate: 'Başlangıç Tarihi',
+    endDate: 'Bitiş Tarihi',
+    filter: 'Filtrele',
+    reset: 'Sıfırla',
   },
   en: {
     // Navigation
@@ -184,6 +214,36 @@ export const translations = {
     'Retirement': 'Retirement',
     'Goal Savings': 'Goal Savings',
     'Other Savings': 'Other Savings',
+    
+    // P1: Settings & Inflation
+    realWealth: 'Real Wealth',
+    inflationRate: 'Inflation Rate (%)',
+    inflationRateDesc: 'Annual inflation estimate (for real wealth calculation)',
+    currency: 'Currency',
+    language: 'Language',
+    theme: 'Theme',
+    light: 'Light',
+    dark: 'Dark',
+    
+    // P1: Export/Import
+    export: 'Export',
+    import: 'Import',
+    exportJSON: 'Download JSON',
+    importJSON: 'Upload JSON',
+    importCSV: 'Upload CSV',
+    selectFile: 'Select File',
+    exportSuccess: 'Data exported successfully!',
+    importSuccess: 'Data imported successfully!',
+    importError: 'File upload failed. Please select a valid file.',
+    
+    // P1: Charts & Reports
+    categoryExpenses: 'Category Expenses',
+    adjustedWealth: 'Inflation-Adjusted Wealth',
+    dateRange: 'Date Range',
+    startDate: 'Start Date',
+    endDate: 'End Date',
+    filter: 'Filter',
+    reset: 'Reset',
   },
 };
 
