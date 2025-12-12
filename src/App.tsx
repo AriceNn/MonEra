@@ -10,6 +10,7 @@ import { Charts } from './components/dashboard/Charts';
 import { TransactionForm } from './components/transactions/TransactionForm';
 import { SettingsPage } from './pages/SettingsPage';
 import { RecurringTransactionsPage } from './pages/RecurringTransactionsPage';
+import { BudgetPage } from './pages/BudgetPage';
 import { generateFinancialSummary } from './utils/calculations';
 import { convertCurrency, fetchLatestRates, updateExchangeRates, loadPersistedRates } from './utils/exchange';
 import './index.css';
@@ -22,7 +23,7 @@ function DashboardContent({ onRatesUpdate }: DashboardContentProps) {
   const { transactions, settings, addTransaction, deleteTransaction, updateTransaction, updateSettings, generateRecurringTransactions } = useFinance();
   const [editingTransaction, setEditingTransaction] = useState<Transaction | undefined>(undefined);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-  const [currentPage, setCurrentPage] = useState<'dashboard' | 'recurring' | 'settings'>('dashboard');
+  const [currentPage, setCurrentPage] = useState<'dashboard' | 'recurring' | 'budget' | 'settings'>('dashboard');
   
   const currentDate = new Date();
   const [selectedMonth, setSelectedMonth] = useState(currentDate.getMonth());
@@ -265,6 +266,16 @@ function DashboardContent({ onRatesUpdate }: DashboardContentProps) {
         <RecurringTransactionsPage
           language={settings.language}
           currency={settings.currency}
+        />
+      )}
+
+      {/* Budget Page */}
+      {currentPage === 'budget' && (
+        <BudgetPage
+          language={settings.language}
+          currency={settings.currency}
+          selectedMonth={selectedMonth}
+          selectedYear={selectedYear}
         />
       )}
 

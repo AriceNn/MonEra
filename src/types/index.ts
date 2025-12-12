@@ -34,6 +34,16 @@ export interface RecurringTransaction {
   originalCurrency: 'TRY' | 'USD' | 'EUR' | 'GBP';
 }
 
+// Budget Model (P2 Sprint 2)
+export interface CategoryBudget {
+  id: string;               // UUID v4
+  category: string;         // Category name (must match EXPENSE_CATEGORIES)
+  monthlyLimit: number;     // Monthly spending limit for this category
+  alertThreshold: number;   // Percentage (0-100) when to show alert (e.g., 80)
+  isActive: boolean;        // Enable/disable budget tracking
+  currency: 'TRY' | 'USD' | 'EUR' | 'GBP'; // Currency for the limit
+}
+
 // Currency Pair Type
 export type CurrencyPair = 'TRY-USD' | 'USD-TRY' | 'EUR-USD' | 'USD-EUR' | 'TRY-EUR' | 'EUR-TRY' | 'GBP-USD' | 'USD-GBP';
 

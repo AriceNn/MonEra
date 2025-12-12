@@ -1,4 +1,4 @@
-import { Settings, Moon, Sun, Globe, DollarSign, LayoutDashboard, Repeat } from 'lucide-react';
+import { Settings, Moon, Sun, Globe, DollarSign, LayoutDashboard, Repeat, Target } from 'lucide-react';
 import type { ReactNode } from 'react';
 
 interface AppShellProps {
@@ -6,8 +6,8 @@ interface AppShellProps {
   theme: 'light' | 'dark';
   language: 'tr' | 'en';
   currency: 'TRY' | 'USD' | 'EUR' | 'GBP';
-  currentPage?: 'dashboard' | 'recurring' | 'settings';
-  onNavigate?: (page: 'dashboard' | 'recurring' | 'settings') => void;
+  currentPage?: 'dashboard' | 'recurring' | 'budget' | 'settings';
+  onNavigate?: (page: 'dashboard' | 'recurring' | 'budget' | 'settings') => void;
   onThemeToggle: () => void;
   onLanguageToggle: () => void;
   onCurrencyToggle?: () => void;
@@ -44,6 +44,7 @@ export function AppShell({
   const navItems = [
     { id: 'dashboard' as const, label: language === 'tr' ? 'Panel' : 'Dashboard', icon: LayoutDashboard },
     { id: 'recurring' as const, label: language === 'tr' ? 'Tekrarlayan İşlemler' : 'Recurring Transactions', icon: Repeat },
+    { id: 'budget' as const, label: language === 'tr' ? 'Bütçe' : 'Budget', icon: Target },
   ];
 
   return (

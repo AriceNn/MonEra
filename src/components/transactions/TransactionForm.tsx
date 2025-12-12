@@ -29,9 +29,10 @@ export function TransactionForm({
   language,
   currency
 }: TransactionFormProps) {
-  const { addRecurringTransaction, generateRecurringTransactions } = useFinance();
+  const { addRecurringTransaction, generateRecurringTransactions, getBudgetProgress, budgets } = useFinance();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isRecurring, setIsRecurring] = useState(false);
+  const [budgetWarning, setBudgetWarning] = useState<string | null>(null);
   const [formData, setFormData] = useState<{
     type: 'income' | 'expense' | 'savings' | 'withdrawal';
     title: string;
@@ -101,6 +102,33 @@ export function TransactionForm({
 
   const handleSubmit = () => {
     if (!validateForm()) return;
+
+    // Check budget before adding expense
+    if (formData.type === 'expense' && mode === 'add') {
+      const date = new Date(formData.date);
+      const month = date.getMonth();
+      const year = date.getFullYear();
+      const amount = parseFloat(formData.amount);
+      
+      const budget = budgets.find(b => b.category === formData.category && b.isActive);
+      if (budget) {
+        const progress = getBudgetProgress(formData.category, month, year);
+        if (progress) {
+          const projectedSpent = progress.spent + amount;
+          const projectedPercentage = (projectedSpent / progress.limit) * 100;
+          
+          if (projectedPercentage >= budget.alertThreshold) {
+            const warningMsg = language === 'tr'
+              ? `Dikkat! Bu işlem bütçenizin %${projectedPercentage.toFixed(0)}'ine ulaşmanıza neden olacak. Devam etmek istiyor musunuz?`
+              : `Warning! This transaction will bring you to ${projectedPercentage.toFixed(0)}% of your budget. Do you want to continue?`;
+            
+            if (!window.confirm(warningMsg)) {
+              return;
+            }
+          }
+        }
+      }
+    }
 
     // If recurring, create recurring transaction AND the first instance manually
     if (isRecurring && mode === 'add') {

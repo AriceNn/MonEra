@@ -14,6 +14,8 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
 export const STORAGE_KEYS = {
   TRANSACTIONS: 'fintrack_transactions',
   SETTINGS: 'fintrack_settings',
+  RECURRING: 'fintrack_recurring',
+  BUDGETS: 'fintrack_budgets',
 } as const;
 
 // Colors for transactions

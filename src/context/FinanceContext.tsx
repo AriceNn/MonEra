@@ -1,7 +1,7 @@
 import { createContext, useCallback } from 'react';
 import type { ReactNode } from 'react';
 import { v4 as uuidv4 } from 'uuid';
-import type { Transaction, AppSettings, RecurringTransaction } from '../types';
+import type { Transaction, AppSettings, RecurringTransaction, CategoryBudget } from '../types';
 import { DEFAULT_SETTINGS } from '../types';
 import { useLocalStorage } from '../hooks/useLocalStorage';
 import { STORAGE_KEYS, DEFAULT_APP_SETTINGS } from '../utils/constants';
@@ -11,6 +11,7 @@ export interface FinanceContextType {
   transactions: Transaction[];
   settings: AppSettings;
   recurringTransactions: RecurringTransaction[];
+  budgets: CategoryBudget[];
   
   // Transaction actions
   addTransaction: (transaction: Omit<Transaction, 'id'>) => boolean;
@@ -18,12 +19,20 @@ export interface FinanceContextType {
   deleteTransaction: (id: string) => void;
   updateTransaction: (id: string, updates: Partial<Omit<Transaction, 'id'>>) => boolean;
   
-  // Recurring transaction actions (P2)
+  // Recurring transaction actions (P2 Sprint 1)
   addRecurringTransaction: (recurring: Omit<RecurringTransaction, 'id'>) => string;
   updateRecurringTransaction: (id: string, updates: Partial<Omit<RecurringTransaction, 'id'>>) => boolean;
   deleteRecurringTransaction: (id: string) => void;
   toggleRecurringActive: (id: string) => void;
   generateRecurringTransactions: () => number;
+  
+  // Budget actions (P2 Sprint 2)
+  setBudget: (budget: Omit<CategoryBudget, 'id'>) => string;
+  updateBudget: (id: string, updates: Partial<Omit<CategoryBudget, 'id'>>) => boolean;
+  deleteBudget: (id: string) => void;
+  toggleBudgetActive: (id: string) => void;
+  getBudgetProgress: (category: string, month: number, year: number) => { spent: number; limit: number; percentage: number; exceeded: boolean } | null;
+  checkBudgetExceeded: (category: string, month: number, year: number) => boolean;
   
   // Settings actions
   updateSettings: (settings: Partial<AppSettings>) => void;
@@ -45,6 +54,11 @@ interface FinanceProviderProps {
 export function FinanceProvider({ children, exchangeRates = {} }: FinanceProviderProps) {
   const [transactions, setTransactions] = useLocalStorage<Transaction[]>(
     STORAGE_KEYS.TRANSACTIONS,
+    []
+  );
+
+  const [budgets, setBudgets] = useLocalStorage<CategoryBudget[]>(
+    STORAGE_KEYS.BUDGETS,
     []
   );
 
@@ -410,10 +424,105 @@ export function FinanceProvider({ children, exchangeRates = {} }: FinanceProvide
     return totalGeneratedCount;
   }, [recurringTransactions, setTransactions, updateRecurringTransaction]);
 
+  // Budget Management (P2 Sprint 2)
+  const setBudget = useCallback(
+    (budget: Omit<CategoryBudget, 'id'>): string => {
+      const newBudget: CategoryBudget = {
+        id: uuidv4(),
+        ...budget,
+      };
+      setBudgets((prev) => [...prev, newBudget]);
+      return newBudget.id;
+    },
+    [setBudgets]
+  );
+
+  const updateBudget = useCallback(
+    (id: string, updates: Partial<Omit<CategoryBudget, 'id'>>): boolean => {
+      setBudgets((prev) =>
+        prev.map((budget) =>
+          budget.id === id ? { ...budget, ...updates } : budget
+        )
+      );
+      return true;
+    },
+    [setBudgets]
+  );
+
+  const deleteBudget = useCallback(
+    (id: string) => {
+      setBudgets((prev) => prev.filter((budget) => budget.id !== id));
+    },
+    [setBudgets]
+  );
+
+  const toggleBudgetActive = useCallback(
+    (id: string) => {
+      setBudgets((prev) =>
+        prev.map((budget) =>
+          budget.id === id ? { ...budget, isActive: !budget.isActive } : budget
+        )
+      );
+    },
+    [setBudgets]
+  );
+
+  const getBudgetProgress = useCallback(
+    (category: string, month: number, year: number) => {
+      // Find active budget for this category
+      const budget = budgets.find(
+        (b) => b.category === category && b.isActive
+      );
+      if (!budget) return null;
+
+      // Calculate total spent in this category for this month
+      const spent = transactions
+        .filter((t) => {
+          const date = new Date(t.date);
+          return (
+            t.type === 'expense' &&
+            t.category === category &&
+            date.getMonth() === month &&
+            date.getFullYear() === year
+          );
+        })
+        .reduce((sum, t) => {
+          // Convert to budget currency if needed
+          const from = (t as any).originalCurrency || settings.currency;
+          if (from === budget.currency) {
+            return sum + t.amount;
+          }
+          // Basic conversion (would use exchange rates in production)
+          const rate = exchangeRates[`${from}-${budget.currency}`] || 1;
+          return sum + t.amount * rate;
+        }, 0);
+
+      const percentage = budget.monthlyLimit > 0 ? (spent / budget.monthlyLimit) * 100 : 0;
+      const exceeded = spent > budget.monthlyLimit;
+
+      return {
+        spent,
+        limit: budget.monthlyLimit,
+        percentage,
+        exceeded,
+      };
+    },
+    [budgets, transactions, settings.currency, exchangeRates]
+  );
+
+  const checkBudgetExceeded = useCallback(
+    (category: string, month: number, year: number): boolean => {
+      const progress = getBudgetProgress(category, month, year);
+      return progress ? progress.exceeded : false;
+    },
+    [getBudgetProgress]
+  );
+
   const value: FinanceContextType = {
     transactions,
     settings,
     recurringTransactions,
+    budgets,
     addTransaction,
     addBulkTransactions,
     deleteTransaction,
@@ -423,6 +532,12 @@ export function FinanceProvider({ children, exchangeRates = {} }: FinanceProvide
     deleteRecurringTransaction,
     toggleRecurringActive,
     generateRecurringTransactions,
+    setBudget,
+    updateBudget,
+    deleteBudget,
+    toggleBudgetActive,
+    getBudgetProgress,
+    checkBudgetExceeded,
     updateSettings,
     resetSettings,
     exportData,
