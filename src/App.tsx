@@ -81,13 +81,19 @@ function DashboardContent({ onRatesUpdate }: DashboardContentProps) {
     return () => clearTimeout(timer);
   }, []);
 
-  // Auto-generate recurring transactions on mount
+  // Auto-generate recurring transactions on mount only (not on dependency changes)
   useEffect(() => {
-    const count = generateRecurringTransactions();
-    if (count > 0) {
-      console.log(`[Auto-Generated] ${count} recurring transactions created`);
-    }
-  }, [generateRecurringTransactions]);
+    const generate = async () => {
+      const count = await generateRecurringTransactions();
+      if (count > 0) {
+        console.log(`[Auto-Generated] ${count} recurring transactions created`);
+      }
+    };
+    
+    generate().catch(error => {
+      console.error('Error generating recurring transactions:', error);
+    });
+  }, []); // Empty dependency array - only run on mount
 
   const handleThemeToggle = () => {
     updateSettings({ theme: settings.theme === 'light' ? 'dark' : 'light' });
@@ -109,8 +115,8 @@ function DashboardContent({ onRatesUpdate }: DashboardContentProps) {
   };
 
   // Wrap addTransaction to automatically switch to the transaction's month
-  const handleAddTransaction = useCallback((transaction: Omit<Transaction, 'id'>) => {
-    const result = addTransaction(transaction);
+  const handleAddTransaction = useCallback(async (transaction: Omit<Transaction, 'id'>) => {
+    const result = await addTransaction(transaction);
     if (result) {
       // If transaction added successfully, switch to that transaction's month
       const txDate = new Date(transaction.date);
@@ -281,8 +287,8 @@ function DashboardContent({ onRatesUpdate }: DashboardContentProps) {
             <TransactionForm
               mode="edit"
               transaction={editingTransaction}
-              onSubmit={(data) => {
-                const ok = updateTransaction(editingTransaction.id, data);
+              onSubmit={async (data) => {
+                const ok = await updateTransaction(editingTransaction.id, data);
                 if (ok !== false) {
                   setEditingTransaction(undefined);
                 }

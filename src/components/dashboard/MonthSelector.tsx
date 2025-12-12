@@ -44,8 +44,6 @@ export function MonthSelector({
     }
   };
 
-  const isCurrentMonth = selectedMonth === currentMonth && selectedYear === currentYear;
-
   // Calculate previous month
   const prevMonth = selectedMonth === 0 ? 11 : selectedMonth - 1;
   const prevYear = selectedMonth === 0 ? selectedYear - 1 : selectedYear;
@@ -53,6 +51,8 @@ export function MonthSelector({
   // Calculate next month
   const nextMonth = selectedMonth === 11 ? 0 : selectedMonth + 1;
   const nextYear = selectedMonth === 11 ? selectedYear + 1 : selectedYear;
+
+  const isCurrentMonth = selectedMonth === currentMonth && selectedYear === currentYear;
 
   return (
     <div className="flex items-center justify-between mb-6 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4 shadow-sm">
@@ -79,7 +79,7 @@ export function MonthSelector({
           {months[selectedMonth]} {selectedYear}
         </h2>
         {isCurrentMonth && (
-          <span className="px-2 py-1 bg-indigo-100 dark:bg-indigo-900 text-indigo-700 dark:text-indigo-300 text-xs font-medium rounded-md">
+          <span className="hidden md:inline-block px-2 py-1 bg-indigo-100 dark:bg-indigo-900 text-indigo-700 dark:text-indigo-300 text-xs font-medium rounded-md">
             {language === 'tr' ? 'Şimdi' : 'Now'}
           </span>
         )}

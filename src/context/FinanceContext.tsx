@@ -5,12 +5,11 @@ import type { Transaction, AppSettings, RecurringTransaction, CategoryBudget } f
 import { DEFAULT_SETTINGS } from '../types';
 import { DEFAULT_APP_SETTINGS } from '../utils/constants';
 import { calculateCashBalance } from '../utils/calculations';
-import type { StorageAdapter } from '../db/StorageAdapter';
-import { getCurrentAdapter, autoMigrate, cleanupBackup } from '../db/migration';
-import { IndexedDBAdapter } from '../db/IndexedDBAdapter';
 import { NotificationManager, DEFAULT_NOTIFICATION_SETTINGS, type Notification, type NotificationSettings } from '../utils/notifications';
 import { syncService, type SyncStatus, type SyncResult } from '../services/syncService';
 import { useAuth } from './AuthContext';
+import { supabase, getCurrentUser } from '../lib/supabase';
+import { runCleanup } from '../lib/cleanupDuplicates';
 
 export interface FinanceContextType {
   transactions: Transaction[];
@@ -19,23 +18,23 @@ export interface FinanceContextType {
   budgets: CategoryBudget[];
   
   // Transaction actions
-  addTransaction: (transaction: Omit<Transaction, 'id'>) => boolean;
-  addBulkTransactions: (transactions: (Omit<Transaction, 'id'> & { id?: string })[], replaceMode?: boolean) => boolean;
-  deleteTransaction: (id: string) => void;
-  updateTransaction: (id: string, updates: Partial<Omit<Transaction, 'id'>>) => boolean;
+  addTransaction: (transaction: Omit<Transaction, 'id'>) => Promise<boolean>;
+  addBulkTransactions: (transactions: (Omit<Transaction, 'id'> & { id?: string })[], replaceMode?: boolean) => Promise<boolean>;
+  deleteTransaction: (id: string) => Promise<void>;
+  updateTransaction: (id: string, updates: Partial<Omit<Transaction, 'id'>>) => Promise<boolean>;
   
   // Recurring transaction actions (P2 Sprint 1)
-  addRecurringTransaction: (recurring: Omit<RecurringTransaction, 'id'>) => string;
-  updateRecurringTransaction: (id: string, updates: Partial<Omit<RecurringTransaction, 'id'>>) => boolean;
-  deleteRecurringTransaction: (id: string) => void;
-  toggleRecurringActive: (id: string) => void;
-  generateRecurringTransactions: () => number;
+  addRecurringTransaction: (recurring: Omit<RecurringTransaction, 'id'>) => Promise<string>;
+  updateRecurringTransaction: (id: string, updates: Partial<Omit<RecurringTransaction, 'id'>>) => Promise<boolean>;
+  deleteRecurringTransaction: (id: string) => Promise<void>;
+  toggleRecurringActive: (id: string) => Promise<void>;
+  generateRecurringTransactions: () => Promise<number>;
   
   // Budget actions (P2 Sprint 2)
-  setBudget: (budget: Omit<CategoryBudget, 'id'>) => string;
-  updateBudget: (id: string, updates: Partial<Omit<CategoryBudget, 'id'>>) => boolean;
-  deleteBudget: (id: string) => void;
-  toggleBudgetActive: (id: string) => void;
+  setBudget: (budget: Omit<CategoryBudget, 'id'>) => Promise<string>;
+  updateBudget: (id: string, updates: Partial<Omit<CategoryBudget, 'id'>>) => Promise<boolean>;
+  deleteBudget: (id: string) => Promise<void>;
+  toggleBudgetActive: (id: string) => Promise<void>;
   getBudgetProgress: (category: string, month: number, year: number) => { spent: number; limit: number; percentage: number; exceeded: boolean } | null;
   checkBudgetExceeded: (category: string, month: number, year: number) => boolean;
   
@@ -49,13 +48,13 @@ export interface FinanceContextType {
   clearAllNotifications: () => void;
   
   // Settings actions
-  updateSettings: (settings: Partial<AppSettings>) => void;
-  resetSettings: () => void;
+  updateSettings: (settings: Partial<AppSettings>) => Promise<boolean>;
+  resetSettings: () => Promise<boolean>;
   
   // Data management
   exportData: () => string;
-  importData: (data: string) => boolean;
-  clearAll: () => void;
+  importData: (data: string) => Promise<boolean>;
+  clearAll: () => Promise<void>;
   
   // Cloud sync actions (P3 Sprint 2)
   syncStatus: SyncStatus;
@@ -74,11 +73,9 @@ interface FinanceProviderProps {
 export function FinanceProvider({ children, exchangeRates = {} }: FinanceProviderProps) {
   const { isAuthenticated, isCloudEnabled } = useAuth();
   
-  // Storage adapter - will be IndexedDB after migration, localStorage as fallback
-  const [adapter, setAdapter] = useState<StorageAdapter | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // State management using React state (synced with storage adapter)
+  // State management using React state (synced with Supabase)
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [budgets, setBudgets] = useState<CategoryBudget[]>([]);
   const [settings, setSettings] = useState<AppSettings>(DEFAULT_APP_SETTINGS);
@@ -119,67 +116,120 @@ export function FinanceProvider({ children, exchangeRates = {} }: FinanceProvide
     });
   }, [notificationManager]);
 
-  // Initialize storage adapter and auto-migrate
+  // Initialize - Load data from Supabase only
   useEffect(() => {
     let mounted = true;
 
     async function initialize() {
       try {
-        let storageAdapter: StorageAdapter;
-        
-        // If cloud sync is enabled, ALWAYS use IndexedDB
-        if (isCloudEnabled) {
-          console.log('[FinanceContext] Cloud sync enabled - using IndexedDB adapter');
-          storageAdapter = new IndexedDBAdapter();
-        } else {
-          // Auto-migrate if needed
-          const migrationResult = await autoMigrate();
-          if (migrationResult) {
-            // Migration successful
-          }
-
-          // Get current adapter (IndexedDB or localStorage)
-          storageAdapter = await getCurrentAdapter();
-        }
+        const user = await getCurrentUser();
         
         if (!mounted) return;
+        
+        if (!user || !isAuthenticated) {
+          // Not authenticated - empty state
+          setTransactions([]);
+          setBudgets([]);
+          setRecurringTransactions([]);
+          setIsLoading(false);
+          return;
+        }
 
-        // Load all data from storage
-        const [txs, bdgs, recur, sett] = await Promise.all([
-          storageAdapter.getAllTransactions(),
-          storageAdapter.getAllBudgets(),
-          storageAdapter.getAllRecurring(),
-          storageAdapter.getSettings()
+        console.log('[FinanceContext] Loading from Supabase for user:', user.email);
+
+        // Load ALL data from Supabase (no local cache)
+        const [txsResult, bdgsResult, recurResult, settResult] = await Promise.all([
+          supabase.from('transactions').select('*').eq('user_id', user.id),
+          supabase.from('budgets').select('*').eq('user_id', user.id),
+          supabase.from('recurring_transactions').select('*').eq('user_id', user.id),
+          supabase.from('settings').select('*').eq('user_id', user.id).single()
         ]);
 
         if (!mounted) return;
 
+        // Map Supabase data to local types
+        const txs: Transaction[] = (txsResult.data || []).map(tx => ({
+          id: tx.id,
+          title: tx.title,
+          amount: tx.amount,
+          category: tx.category,
+          date: tx.date,
+          type: tx.type,
+          description: tx.description,
+          isRecurring: tx.is_recurring,
+          recurringId: tx.recurring_id,
+          originalCurrency: tx.original_currency
+        }));
+
+        const bdgs: CategoryBudget[] = (bdgsResult.data || []).map(b => ({
+          id: b.id,
+          category: b.category,
+          monthlyLimit: b.monthly_limit,
+          alertThreshold: b.alert_threshold,
+          isActive: b.is_active,
+          currency: b.currency
+        }));
+
+        const recur: RecurringTransaction[] = (recurResult.data || []).map(r => ({
+          id: r.id,
+          title: r.title,
+          amount: r.amount,
+          category: r.category,
+          type: r.type,
+          frequency: r.frequency,
+          startDate: r.start_date,
+          endDate: r.end_date,
+          lastGenerated: r.last_generated,
+          nextOccurrence: r.next_occurrence,
+          isActive: r.is_active,
+          description: r.description,
+          originalCurrency: r.original_currency
+        }));
+
+        let sett = DEFAULT_APP_SETTINGS;
+        if (settResult.data) {
+          sett = {
+            currency: settResult.data.currency,
+            language: settResult.data.language,
+            theme: settResult.data.theme,
+            inflationRate: settResult.data.inflation_rate
+          };
+        }
+
         setTransactions(txs);
         setBudgets(bdgs);
         setRecurringTransactions(recur);
+        setSettings(sett);
         
-        // Detect system theme preference and use it if no theme was explicitly saved
-        const systemTheme: 'light' | 'dark' = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-        
-        // Check if this is first load (no transactions, no budgets, default theme)
-        const isFirstLoad = txs.length === 0 && bdgs.length === 0 && sett.theme === DEFAULT_APP_SETTINGS.theme;
-        
-        if (isFirstLoad) {
-          // First time user - use system theme
-          const settingsWithSystemTheme: AppSettings = { ...sett, theme: systemTheme };
-          setSettings(settingsWithSystemTheme);
-        } else {
-          setSettings(sett);
-        }
-        
-        setAdapter(storageAdapter);
         setIsLoading(false);
 
-        // Cleanup old backups (30+ days)
-        cleanupBackup();
+        // Run cleanup after loading - removes duplicate transactions/budgets
+        console.log('[FinanceContext] Starting cleanup of duplicates...');
+        const cleanupResult = await runCleanup();
+        if (cleanupResult.transactions > 0 || cleanupResult.budgets > 0) {
+          console.log('[FinanceContext] Cleanup removed:', cleanupResult);
+          // Reload data after cleanup
+          const cleanTxsResult = await supabase.from('transactions').select('*').eq('user_id', user.id);
+          if (cleanTxsResult.data) {
+            const cleanTxs: Transaction[] = cleanTxsResult.data.map(tx => ({
+              id: tx.id,
+              title: tx.title,
+              amount: tx.amount,
+              category: tx.category,
+              date: tx.date,
+              type: tx.type,
+              description: tx.description,
+              isRecurring: tx.is_recurring,
+              recurringId: tx.recurring_id,
+              originalCurrency: tx.original_currency
+            }));
+            if (mounted) {
+              setTransactions(cleanTxs);
+            }
+          }
+        }
       } catch (error) {
         console.error('[FinanceContext] Initialization error:', error);
-        // Fallback to empty state if initialization fails
         if (!mounted) return;
         setIsLoading(false);
       }
@@ -190,7 +240,7 @@ export function FinanceProvider({ children, exchangeRates = {} }: FinanceProvide
     return () => {
       mounted = false;
     };
-  }, []);
+  }, [isAuthenticated]);
 
   // Summary is calculated in App component for correct month/year context
 
@@ -209,8 +259,12 @@ export function FinanceProvider({ children, exchangeRates = {} }: FinanceProvide
 
   // Transaction actions
   const addTransaction = useCallback(
-    (transaction: Omit<Transaction, 'id'>) => {
-      if (!adapter) return false;
+    async (transaction: Omit<Transaction, 'id'>) => {
+      const user = await getCurrentUser();
+      if (!user || !isAuthenticated) {
+        console.error('[FinanceContext] Not authenticated');
+        return false;
+      }
 
       // Pre-check for savings validation
       if (transaction.type === 'savings') {
@@ -230,18 +284,33 @@ export function FinanceProvider({ children, exchangeRates = {} }: FinanceProvide
         }
       }
 
-      // If validation passed, add the transaction
+      // Create transaction with ID
       const newTransaction: Transaction = {
         ...transaction,
         id: uuidv4(),
       };
       
-      // Update storage asynchronously
-      adapter.addTransaction(newTransaction).catch(error => {
-        console.error('[FinanceContext] Error adding transaction:', error);
+      // Insert to Supabase
+      const { error } = await supabase.from('transactions').insert({
+        id: newTransaction.id,
+        user_id: user.id,
+        title: newTransaction.title,
+        amount: newTransaction.amount,
+        category: newTransaction.category,
+        type: newTransaction.type,
+        date: newTransaction.date,
+        description: newTransaction.description,
+        is_recurring: newTransaction.isRecurring || false,
+        recurring_id: newTransaction.recurringId,
+        original_currency: newTransaction.originalCurrency,
       });
+
+      if (error) {
+        console.error('[FinanceContext] Error adding transaction to Supabase:', error);
+        return false;
+      }
       
-      // Update state immediately for UI responsiveness
+      // Update local state
       setTransactions((prev) => {
         const updated = [newTransaction, ...prev];
         
@@ -286,36 +355,28 @@ export function FinanceProvider({ children, exchangeRates = {} }: FinanceProvide
         return updated;
       });
       
-      // Push to cloud if authenticated and auto-sync enabled
-      if (isAuthenticated && isCloudEnabled && autoSync) {
-        console.log('📤 [FinanceContext] Auto-sync enabled, pushing transaction to cloud...', {
-          isAuthenticated,
-          isCloudEnabled,
-          autoSync,
-          transactionId: newTransaction.id
-        });
-        syncService.pushTransaction(newTransaction).catch(error => {
-          console.error('❌ [FinanceContext] Error syncing transaction:', error);
-        });
-      } else {
-        console.log('⚠️ [FinanceContext] Auto-sync skipped:', { isAuthenticated, isCloudEnabled, autoSync });
-      }
-      
       return true;
     },
-    [adapter, transactions, convertToTRY, budgets, notificationManager, isAuthenticated, isCloudEnabled, autoSync]
+    [transactions, convertToTRY, budgets, notificationManager, isAuthenticated]
   );
 
   const deleteTransaction = useCallback(
-    (id: string) => {
-      if (!adapter) return;
+    async (id: string) => {
+      const user = await getCurrentUser();
+      if (!user || !isAuthenticated) {
+        console.error('[FinanceContext] Not authenticated');
+        return;
+      }
 
-      // Update storage asynchronously
-      adapter.deleteTransaction(id).catch(error => {
-        console.error('[FinanceContext] Error deleting transaction:', error);
-      });
+      // Delete from Supabase
+      const { error } = await supabase.from('transactions').delete().eq('id', id).eq('user_id', user.id);
+      
+      if (error) {
+        console.error('[FinanceContext] Error deleting transaction from Supabase:', error);
+        return;
+      }
 
-      // Update state immediately
+      // Update state
       setTransactions((prev) => prev.filter((t) => t.id !== id));
       
       // Track deleted ID to prevent re-import
@@ -324,94 +385,102 @@ export function FinanceProvider({ children, exchangeRates = {} }: FinanceProvide
         newSet.add(id);
         return newSet;
       });
-      
-      // Delete from cloud if authenticated
-      if (isAuthenticated && isCloudEnabled && autoSync) {
-        console.log('🗑️ [FinanceContext] Auto-sync enabled, deleting from cloud...', {
-          isAuthenticated,
-          isCloudEnabled,
-          autoSync,
-          transactionId: id
-        });
-        syncService.deleteTransaction(id).catch(error => {
-          console.error('❌ [FinanceContext] Error syncing deletion:', error);
-        });
-      } else {
-        console.log('⚠️ [FinanceContext] Delete sync skipped:', { isAuthenticated, isCloudEnabled, autoSync });
-      }
     },
-    [adapter, isAuthenticated, isCloudEnabled, autoSync]
+    [isAuthenticated]
   );
 
   const addBulkTransactions = useCallback(
-    (newTransactions: (Omit<Transaction, 'id'> & { id?: string })[], replaceMode: boolean = false) => {
-      if (!adapter) return false;
+    async (newTransactions: (Omit<Transaction, 'id'> & { id?: string })[], replaceMode: boolean = false) => {
+      const user = await getCurrentUser();
+      if (!user || !isAuthenticated) {
+        console.error('[FinanceContext] Not authenticated');
+        return false;
+      }
 
       // If replace mode, clear deletedIds as well since we're starting fresh
       if (replaceMode) {
         setDeletedIds(new Set());
+        // Delete all existing transactions from Supabase
+        const { error: deleteError } = await supabase
+          .from('transactions')
+          .delete()
+          .eq('user_id', user.id);
+        
+        if (deleteError) {
+          console.error('[FinanceContext] Error clearing transactions:', deleteError);
+          return false;
+        }
       }
       
-      setTransactions((prev) => {
-        // If replace mode, clear all existing transactions first
-        const baseTransactions = replaceMode ? [] : prev;
-        
-        // Build a simple dedup key from core fields
-        const keyOf = (t: Omit<Transaction, 'id'> | Transaction) =>
-          `${(t.title || '').trim().toLowerCase()}|${t.amount}|${(t.category || '').trim().toLowerCase()}|${t.date}|${t.type}|${(t as any).originalCurrency || 'TRY'}`;
+      // Build transactions with IDs
+      const keyOf = (t: Omit<Transaction, 'id'> | Transaction) =>
+        `${(t.title || '').trim().toLowerCase()}|${t.amount}|${(t.category || '').trim().toLowerCase()}|${t.date}|${t.type}|${(t as any).originalCurrency || 'TRY'}`;
 
-        // Track both existing keys (content-based) and IDs from CURRENT state only
-        // This ensures we only check against what's actually in the current state
-        // If user deleted something, it won't be in 'prev' anymore
-        const existingKeys = new Set(baseTransactions.map((p) => keyOf(p)));
-        const existingIds = new Set(baseTransactions.map((p) => p.id));
+      const existingKeys = new Set(transactions.map((p) => keyOf(p)));
+      const existingIds = new Set(transactions.map((p) => p.id));
 
-        // Filter out duplicates by ID (existing OR deleted), then by content key
-        const dedupedIncoming = newTransactions.filter((t) => {
-          // In replace mode, don't check deletedIds since we cleared it
-          if (!replaceMode && t.id && deletedIds.has(t.id)) {
-            return false;
-          }
-          // If transaction has an ID and it already exists, skip it
-          if (t.id && existingIds.has(t.id)) {
-            return false;
-          }
-          // Otherwise check by content key
-          if (existingKeys.has(keyOf(t))) {
-            return false;
-          }
-          return true;
-        });
-
-        // Use existing ID if available, otherwise generate new one
-        const withIds = dedupedIncoming.map((t) => ({
-          ...t,
-          id: t.id || uuidv4(),
-        }));
-
-        // Update storage asynchronously
-        if (replaceMode) {
-          adapter.clearAll().then(() => {
-            return Promise.all(withIds.map(tx => adapter.addTransaction(tx)));
-          }).catch(error => {
-            console.error('[FinanceContext] Error in bulk replace:', error);
-          });
-        } else {
-          Promise.all(withIds.map(tx => adapter.addTransaction(tx))).catch(error => {
-            console.error('[FinanceContext] Error in bulk add:', error);
-          });
+      // Filter out duplicates
+      const dedupedIncoming = newTransactions.filter((t) => {
+        if (!replaceMode && t.id && deletedIds.has(t.id)) {
+          return false;
         }
+        if (t.id && existingIds.has(t.id)) {
+          return false;
+        }
+        if (existingKeys.has(keyOf(t))) {
+          return false;
+        }
+        return true;
+      });
 
+      // Add IDs if missing
+      const withIds = dedupedIncoming.map((t) => ({
+        ...t,
+        id: t.id || uuidv4(),
+      }));
+
+      // Insert to Supabase
+      if (withIds.length > 0) {
+        const { error: insertError } = await supabase
+          .from('transactions')
+          .insert(withIds.map(tx => ({
+            id: tx.id,
+            user_id: user.id,
+            title: tx.title,
+            amount: tx.amount,
+            category: tx.category,
+            type: tx.type,
+            date: tx.date,
+            description: tx.description,
+            is_recurring: tx.isRecurring || false,
+            recurring_id: tx.recurringId,
+            original_currency: tx.originalCurrency,
+          })));
+
+        if (insertError) {
+          console.error('[FinanceContext] Error inserting bulk transactions:', insertError);
+          return false;
+        }
+      }
+
+      // Update local state
+      setTransactions((prev) => {
+        const baseTransactions = replaceMode ? [] : prev;
         return [...withIds, ...baseTransactions];
       });
+
       return true;
     },
-    [adapter, deletedIds]
+    [transactions, deletedIds, isAuthenticated]
   );
 
   const updateTransaction = useCallback(
-    (id: string, updates: Partial<Omit<Transaction, 'id'>>) => {
-      if (!adapter) return false;
+    async (id: string, updates: Partial<Omit<Transaction, 'id'>>) => {
+      const user = await getCurrentUser();
+      if (!user || !isAuthenticated) {
+        console.error('[FinanceContext] Not authenticated');
+        return false;
+      }
 
       let updated = false;
       setTransactions((prev) => {
@@ -429,30 +498,59 @@ export function FinanceProvider({ children, exchangeRates = {} }: FinanceProvide
           }
         }
 
-        // Update storage asynchronously
-        adapter.updateTransaction(id, updates).catch(error => {
-          console.error('[FinanceContext] Error updating transaction:', error);
-        });
-
         updated = true;
         return next;
       });
+
+      if (updated) {
+        // Update in Supabase
+        const { error } = await supabase.from('transactions').update({
+          title: updates.title,
+          amount: updates.amount,
+          category: updates.category,
+          type: updates.type,
+          date: updates.date,
+          description: updates.description,
+          is_recurring: updates.isRecurring,
+          recurring_id: updates.recurringId,
+          original_currency: updates.originalCurrency,
+        }).eq('id', id).eq('user_id', user.id);
+
+        if (error) {
+          console.error('[FinanceContext] Error updating transaction in Supabase:', error);
+          return false;
+        }
+      }
+
       return updated;
     },
-    [adapter]
+    [isAuthenticated]
   );
 
   // Settings actions
   const updateSettings = useCallback(
-    (newSettings: Partial<AppSettings>) => {
-      if (!adapter) return;
+    async (newSettings: Partial<AppSettings>): Promise<boolean> => {
+      const user = await getCurrentUser();
+      if (!user || !isAuthenticated) {
+        console.error('[FinanceContext] Not authenticated');
+        return false;
+      }
 
-      // Update storage asynchronously
-      adapter.updateSettings(newSettings).catch(error => {
+      // Update in Supabase
+      const { error } = await supabase.from('app_settings').update({
+        language: newSettings.language,
+        currency: newSettings.currency,
+        theme: newSettings.theme,
+        notifications_enabled: newSettings.notificationsEnabled,
+        notification_sound: newSettings.notificationSound,
+      }).eq('user_id', user.id);
+
+      if (error) {
         console.error('[FinanceContext] Error updating settings:', error);
-      });
+        return false;
+      }
 
-      // Update state immediately
+      // Update state
       setSettings((prev) => {
         const updated = { ...prev, ...newSettings };
         
@@ -463,21 +561,37 @@ export function FinanceProvider({ children, exchangeRates = {} }: FinanceProvide
         
         return updated;
       });
+      
+      return true;
     },
-    [adapter, notificationManager]
+    [isAuthenticated, notificationManager]
   );
 
-  const resetSettings = useCallback(() => {
-    if (!adapter) return;
+  const resetSettings = useCallback(async (): Promise<boolean> => {
+    const user = await getCurrentUser();
+    if (!user || !isAuthenticated) {
+      console.error('[FinanceContext] Not authenticated');
+      return false;
+    }
 
-    // Update storage asynchronously
-    adapter.resetSettings().catch(error => {
+    // Update in Supabase
+    const { error } = await supabase.from('app_settings').update({
+      language: DEFAULT_SETTINGS.language,
+      currency: DEFAULT_SETTINGS.currency,
+      theme: DEFAULT_SETTINGS.theme,
+      notifications_enabled: DEFAULT_SETTINGS.notificationsEnabled,
+      notification_sound: DEFAULT_SETTINGS.notificationSound,
+    }).eq('user_id', user.id);
+
+    if (error) {
       console.error('[FinanceContext] Error resetting settings:', error);
-    });
+      return false;
+    }
 
-    // Update state immediately
+    // Update state
     setSettings(DEFAULT_SETTINGS);
-  }, [adapter]);
+    return true;
+  }, [isAuthenticated]);
 
   // Data management
   const exportData = useCallback(() => {
@@ -489,8 +603,12 @@ export function FinanceProvider({ children, exchangeRates = {} }: FinanceProvide
   }, [transactions, budgets, recurringTransactions, settings]);
 
   const importData = useCallback(
-    (data: string): boolean => {
-      if (!adapter) return false;
+    async (data: string): Promise<boolean> => {
+      const user = await getCurrentUser();
+      if (!user || !isAuthenticated) {
+        console.error('[FinanceContext] Not authenticated');
+        return false;
+      }
 
       try {
         const parsed = JSON.parse(data);
@@ -498,17 +616,74 @@ export function FinanceProvider({ children, exchangeRates = {} }: FinanceProvide
           return false;
         }
 
-        // Import to storage adapter
-        adapter.importAll({
-          transactions: parsed.transactions || [],
-          budgets: parsed.budgets || [],
-          recurring: parsed.recurringTransactions || [],
-          settings: parsed.settings || DEFAULT_APP_SETTINGS
-        }).catch(error => {
-          console.error('[FinanceContext] Error importing data:', error);
-        });
+        // Import transactions to Supabase
+        const { error: txError } = await supabase.from('transactions').insert(
+          parsed.transactions.map((tx: Transaction) => ({
+            id: tx.id,
+            user_id: user.id,
+            title: tx.title,
+            amount: tx.amount,
+            category: tx.category,
+            type: tx.type,
+            date: tx.date,
+            original_currency: tx.originalCurrency,
+            is_recurring: tx.isRecurring,
+            recurring_id: tx.recurringId || null,
+            description: tx.description || null,
+          }))
+        );
 
-        // Update state immediately
+        if (txError) {
+          console.error('[FinanceContext] Error importing transactions:', txError);
+          return false;
+        }
+
+        // Import budgets if available
+        if (parsed.budgets && Array.isArray(parsed.budgets)) {
+          const { error: budgetError } = await supabase.from('budgets').insert(
+            parsed.budgets.map((b: CategoryBudget) => ({
+              id: b.id,
+              user_id: user.id,
+              category: b.category,
+              monthly_limit: b.monthlyLimit,
+              alert_threshold: b.alertThreshold,
+              is_active: b.isActive,
+              currency: b.currency,
+            }))
+          );
+
+          if (budgetError) {
+            console.error('[FinanceContext] Error importing budgets:', budgetError);
+          }
+        }
+
+        // Import recurring transactions if available
+        if (parsed.recurringTransactions && Array.isArray(parsed.recurringTransactions)) {
+          const { error: recurringError } = await supabase.from('recurring_transactions').insert(
+            parsed.recurringTransactions.map((r: RecurringTransaction) => ({
+              id: r.id,
+              user_id: user.id,
+              title: r.title,
+              amount: r.amount,
+              category: r.category,
+              type: r.type,
+              frequency: r.frequency,
+              start_date: r.startDate,
+              end_date: r.endDate || null,
+              last_generated: r.lastGenerated || null,
+              next_occurrence: r.nextOccurrence,
+              is_active: r.isActive,
+              description: r.description || null,
+              original_currency: r.originalCurrency,
+            }))
+          );
+
+          if (recurringError) {
+            console.error('[FinanceContext] Error importing recurring:', recurringError);
+          }
+        }
+
+        // Update state
         setTransactions(parsed.transactions);
         if (parsed.budgets) setBudgets(parsed.budgets);
         if (parsed.recurringTransactions) setRecurringTransactions(parsed.recurringTransactions);
@@ -519,29 +694,37 @@ export function FinanceProvider({ children, exchangeRates = {} }: FinanceProvide
         return false;
       }
     },
-    [adapter]
+    [isAuthenticated]
   );
 
-  const clearAll = useCallback(() => {
-    if (!adapter) return;
+  const clearAll = useCallback(async () => {
+    const user = await getCurrentUser();
+    if (!user || !isAuthenticated) {
+      console.error('[FinanceContext] Not authenticated');
+      return;
+    }
 
-    // Clear storage asynchronously
-    adapter.clearAll().catch(error => {
-      console.error('[FinanceContext] Error clearing data:', error);
-    });
+    // Delete all data from Supabase
+    await supabase.from('transactions').delete().eq('user_id', user.id);
+    await supabase.from('budgets').delete().eq('user_id', user.id);
+    await supabase.from('recurring_transactions').delete().eq('user_id', user.id);
 
-    // Clear state immediately
+    // Clear state
     setTransactions([]);
     setBudgets([]);
     setRecurringTransactions([]);
     setSettings(DEFAULT_APP_SETTINGS);
     setDeletedIds(new Set());
-  }, [adapter]);
+  }, [isAuthenticated]);
 
   // Recurring Transaction actions (P2)
   const addRecurringTransaction = useCallback(
-    (recurring: Omit<RecurringTransaction, 'id'>): string => {
-      if (!adapter) return '';
+    async (recurring: Omit<RecurringTransaction, 'id'>): Promise<string> => {
+      const user = await getCurrentUser();
+      if (!user || !isAuthenticated) {
+        console.error('[FinanceContext] Not authenticated');
+        return '';
+      }
 
       const newRecurring: RecurringTransaction = {
         ...recurring,
@@ -549,37 +732,207 @@ export function FinanceProvider({ children, exchangeRates = {} }: FinanceProvide
         isActive: true,
       };
 
-      // Update storage asynchronously
-      adapter.addRecurring(newRecurring).catch(error => {
+      // Insert to Supabase
+      const { error } = await supabase.from('recurring_transactions').insert({
+        id: newRecurring.id,
+        user_id: user.id,
+        title: newRecurring.title,
+        amount: newRecurring.amount,
+        category: newRecurring.category,
+        type: newRecurring.type,
+        frequency: newRecurring.frequency,
+        start_date: newRecurring.startDate,
+        end_date: newRecurring.endDate || null,
+        last_generated: newRecurring.lastGenerated || null,
+        next_occurrence: newRecurring.nextOccurrence,
+        is_active: newRecurring.isActive,
+        description: newRecurring.description || null,
+        original_currency: newRecurring.originalCurrency,
+      });
+
+      if (error) {
         console.error('[FinanceContext] Error adding recurring:', error);
-      });
+        return '';
+      }
 
-      // Push to cloud
-      syncService.pushRecurringTransaction(newRecurring).catch(error => {
-        console.error('[FinanceContext] Error syncing recurring to cloud:', error);
-      });
+      // Update state with new recurring transaction
+      setRecurringTransactions((prev) => [newRecurring, ...prev]);
 
-      // Update state immediately
-      setRecurringTransactions((prev) => {
-        const updated = [newRecurring, ...prev];
-        
-        // Generate transactions for this new recurring immediately (using updated state)
-        setTimeout(() => {
-          generateRecurringTransactionsForOne(newRecurring);
-        }, 0);
-        
-        return updated;
-      });
+      // Generate transactions asynchronously (don't await, fire-and-forget)
+      // This is done separately to avoid circular dependency issues
+      (async () => {
+        try {
+          const user = await getCurrentUser();
+          if (!user || !isAuthenticated) return;
+
+          // Generate first transaction(s) for this recurring
+          const today = new Date();
+          today.setHours(0, 0, 0, 0);
+
+          const startDate = new Date(newRecurring.startDate);
+          startDate.setHours(0, 0, 0, 0);
+
+          const endDate = newRecurring.endDate ? new Date(newRecurring.endDate) : null;
+          if (endDate) {
+            endDate.setHours(0, 0, 0, 0);
+          }
+
+          let currentDate = new Date(newRecurring.nextOccurrence);
+          currentDate.setHours(0, 0, 0, 0);
+
+          const maxDate = endDate ? endDate : new Date(today.getTime() + 60 * 24 * 60 * 60 * 1000);
+          const transactionsToAdd: Transaction[] = [];
+
+          while (currentDate <= maxDate && transactionsToAdd.length < 5) {
+            const dateString = currentDate.toISOString().split('T')[0];
+            transactionsToAdd.push({
+              id: uuidv4(),
+              title: newRecurring.title,
+              amount: newRecurring.amount,
+              category: newRecurring.category,
+              type: newRecurring.type,
+              date: dateString,
+              originalCurrency: newRecurring.originalCurrency,
+              isRecurring: true,
+              recurringId: newRecurring.id,
+              description: newRecurring.description,
+            });
+
+            switch (newRecurring.frequency) {
+              case 'daily':
+                currentDate.setDate(currentDate.getDate() + 1);
+                break;
+              case 'weekly':
+                currentDate.setDate(currentDate.getDate() + 7);
+                break;
+              case 'biweekly':
+                currentDate.setDate(currentDate.getDate() + 14);
+                break;
+              case 'monthly':
+                currentDate.setMonth(currentDate.getMonth() + 1);
+                break;
+              case 'quarterly':
+                currentDate.setMonth(currentDate.getMonth() + 3);
+                break;
+              case 'yearly':
+                currentDate.setFullYear(currentDate.getFullYear() + 1);
+                break;
+            }
+          }
+
+          if (transactionsToAdd.length > 0) {
+            const { data: existingTxs } = await supabase
+              .from('transactions')
+              .select('date')
+              .eq('user_id', user.id)
+              .eq('recurring_id', newRecurring.id);
+
+            const existingDates = new Set((existingTxs || []).map(t => t.date));
+            const newTransactions = transactionsToAdd.filter(
+              (tx) => !existingDates.has(tx.date)
+            );
+
+            if (newTransactions.length > 0) {
+              await supabase.from('transactions').insert(
+                newTransactions.map(tx => ({
+                  id: tx.id,
+                  user_id: user.id,
+                  title: tx.title,
+                  amount: tx.amount,
+                  category: tx.category,
+                  type: tx.type,
+                  date: tx.date,
+                  original_currency: tx.originalCurrency,
+                  is_recurring: tx.isRecurring,
+                  recurring_id: tx.recurringId || null,
+                  description: tx.description || null,
+                }))
+              );
+
+              setTransactions((prev) => [...newTransactions, ...prev]);
+
+              // Update nextOccurrence
+              const lastTx = newTransactions[newTransactions.length - 1];
+              const nextDate = new Date(lastTx.date);
+              switch (newRecurring.frequency) {
+                case 'daily':
+                  nextDate.setDate(nextDate.getDate() + 1);
+                  break;
+                case 'weekly':
+                  nextDate.setDate(nextDate.getDate() + 7);
+                  break;
+                case 'biweekly':
+                  nextDate.setDate(nextDate.getDate() + 14);
+                  break;
+                case 'monthly':
+                  nextDate.setMonth(nextDate.getMonth() + 1);
+                  break;
+                case 'quarterly':
+                  nextDate.setMonth(nextDate.getMonth() + 3);
+                  break;
+                case 'yearly':
+                  nextDate.setFullYear(nextDate.getFullYear() + 1);
+                  break;
+              }
+
+              await supabase.from('recurring_transactions').update({
+                last_generated: lastTx.date,
+                next_occurrence: nextDate.toISOString().split('T')[0],
+              }).eq('id', newRecurring.id).eq('user_id', user.id);
+
+              setRecurringTransactions((prev) =>
+                prev.map((r) =>
+                  r.id === newRecurring.id
+                    ? {
+                        ...r,
+                        lastGenerated: lastTx.date,
+                        nextOccurrence: nextDate.toISOString().split('T')[0],
+                      }
+                    : r
+                )
+              );
+            }
+          }
+        } catch (err) {
+          console.error('[FinanceContext] Error generating transactions for new recurring:', err);
+        }
+      })();
       
       return newRecurring.id;
     },
-    [adapter]
+    [isAuthenticated]
   );
 
   const updateRecurringTransaction = useCallback(
-    (id: string, updates: Partial<Omit<RecurringTransaction, 'id'>>): boolean => {
-      if (!adapter) return false;
+    async (id: string, updates: Partial<Omit<RecurringTransaction, 'id'>>): Promise<boolean> => {
+      const user = await getCurrentUser();
+      if (!user || !isAuthenticated) {
+        console.error('[FinanceContext] Not authenticated');
+        return false;
+      }
 
+      // Update in Supabase
+      const { error } = await supabase.from('recurring_transactions').update({
+        title: updates.title,
+        amount: updates.amount,
+        category: updates.category,
+        type: updates.type,
+        frequency: updates.frequency,
+        start_date: updates.startDate,
+        end_date: updates.endDate || null,
+        last_generated: updates.lastGenerated || null,
+        next_occurrence: updates.nextOccurrence,
+        is_active: updates.isActive,
+        description: updates.description || null,
+        original_currency: updates.originalCurrency,
+      }).eq('id', id).eq('user_id', user.id);
+
+      if (error) {
+        console.error('[FinanceContext] Error updating recurring:', error);
+        return false;
+      }
+
+      // Update state
       let updated = false;
       setRecurringTransactions((prev) => {
         const index = prev.findIndex((r) => r.id === id);
@@ -588,203 +941,93 @@ export function FinanceProvider({ children, exchangeRates = {} }: FinanceProvide
         const updatedRecurring: RecurringTransaction = { ...prev[index], ...updates };
         const next = [...prev];
         next[index] = updatedRecurring;
-
-        // Update storage asynchronously
-        adapter.updateRecurring(id, updates).catch(error => {
-          console.error('[FinanceContext] Error updating recurring:', error);
-        });
-
-        // Push update to cloud
-        syncService.pushRecurringTransaction(updatedRecurring).catch(error => {
-          console.error('[FinanceContext] Error syncing recurring update to cloud:', error);
-        });
-
         updated = true;
         return next;
       });
       return updated;
     },
-    [adapter]
+    [isAuthenticated]
   );
 
   const deleteRecurringTransaction = useCallback(
-    (id: string) => {
-      if (!adapter) return;
+    async (id: string) => {
+      const user = await getCurrentUser();
+      if (!user || !isAuthenticated) {
+        console.error('[FinanceContext] Not authenticated');
+        return;
+      }
 
-      // Update storage asynchronously
-      adapter.deleteRecurring(id).catch(error => {
+      // First, delete all generated transactions with this recurring_id
+      const { error: transactionsError } = await supabase
+        .from('transactions')
+        .delete()
+        .eq('recurring_id', id)
+        .eq('user_id', user.id);
+
+      if (transactionsError) {
+        console.error('[FinanceContext] Error deleting related transactions:', transactionsError);
+        return;
+      }
+
+      // Then, delete the recurring transaction template
+      const { error } = await supabase
+        .from('recurring_transactions')
+        .delete()
+        .eq('id', id)
+        .eq('user_id', user.id);
+
+      if (error) {
         console.error('[FinanceContext] Error deleting recurring:', error);
-      });
+        return;
+      }
 
-      // Delete from cloud
-      syncService.deleteRecurringTransaction(id).catch(error => {
-        console.error('[FinanceContext] Error deleting recurring from cloud:', error);
-      });
-
-      // Update state immediately
+      // Update state - remove from both transactions and recurring transactions
+      setTransactions((prev) => prev.filter((t) => t.recurringId !== id));
       setRecurringTransactions((prev) => prev.filter((r) => r.id !== id));
     },
-    [adapter]
+    [isAuthenticated]
   );
 
   const toggleRecurringActive = useCallback(
-    (id: string) => {
-      if (!adapter) return;
+    async (id: string) => {
+      const user = await getCurrentUser();
+      if (!user || !isAuthenticated) {
+        console.error('[FinanceContext] Not authenticated');
+        return;
+      }
 
-      setRecurringTransactions((prev) => {
-        const updated = prev.map((r) => {
-          if (r.id === id) {
-            const toggled = { ...r, isActive: !r.isActive };
-            
-            // Update storage asynchronously
-            adapter.updateRecurring(id, { isActive: toggled.isActive }).catch(error => {
-              console.error('[FinanceContext] Error toggling recurring:', error);
-            });
-            
-            return toggled;
-          }
-          return r;
-        });
-        return updated;
-      });
+      const recurring = recurringTransactions.find(r => r.id === id);
+      if (!recurring) return;
+
+      const newIsActive = !recurring.isActive;
+
+      // Update in Supabase
+      const { error } = await supabase
+        .from('recurring_transactions')
+        .update({ is_active: newIsActive })
+        .eq('id', id)
+        .eq('user_id', user.id);
+
+      if (error) {
+        console.error('[FinanceContext] Error toggling recurring:', error);
+        return;
+      }
+
+      // Update state
+      setRecurringTransactions((prev) =>
+        prev.map((r) => (r.id === id ? { ...r, isActive: newIsActive } : r))
+      );
     },
-    [adapter]
+    [recurringTransactions, isAuthenticated]
   );
 
-  // Helper: Generate transactions for a single recurring (used when adding new recurring)
-  const generateRecurringTransactionsForOne = useCallback((recurring: RecurringTransaction): number => {
-    if (!recurring.isActive) return 0;
-
-    let generatedCount = 0;
-    const startDate = new Date(recurring.startDate);
-    startDate.setHours(0, 0, 0, 0);
-
-    const endDate = recurring.endDate ? new Date(recurring.endDate) : null;
-    if (endDate) {
-      endDate.setHours(0, 0, 0, 0);
+  const generateRecurringTransactions = useCallback(async (): Promise<number> => {
+    const user = await getCurrentUser();
+    if (!user || !isAuthenticated) {
+      console.error('[FinanceContext] Not authenticated');
+      return 0;
     }
 
-    // Start from nextOccurrence
-    let currentDate = new Date(recurring.nextOccurrence);
-    currentDate.setHours(0, 0, 0, 0);
-
-    // Generate all transactions
-    const transactionsToAdd: Transaction[] = [];
-    
-    while (endDate ? currentDate <= endDate : true) {
-      const transactionDate = new Date(currentDate);
-      const dateString = transactionDate.toISOString().split('T')[0];
-
-      const newTransaction: Transaction = {
-        id: uuidv4(),
-        title: recurring.title,
-        amount: recurring.amount,
-        category: recurring.category,
-        type: recurring.type,
-        date: dateString,
-        originalCurrency: recurring.originalCurrency,
-        isRecurring: true,
-        recurringId: recurring.id,
-        description: recurring.description,
-      };
-
-      transactionsToAdd.push(newTransaction);
-
-      // Move to next occurrence
-      switch (recurring.frequency) {
-        case 'daily':
-          currentDate.setDate(currentDate.getDate() + 1);
-          break;
-        case 'weekly':
-          currentDate.setDate(currentDate.getDate() + 7);
-          break;
-        case 'biweekly':
-          currentDate.setDate(currentDate.getDate() + 14);
-          break;
-        case 'monthly':
-          currentDate.setMonth(currentDate.getMonth() + 1);
-          break;
-        case 'quarterly':
-          currentDate.setMonth(currentDate.getMonth() + 3);
-          break;
-        case 'yearly':
-          currentDate.setFullYear(currentDate.getFullYear() + 1);
-          break;
-      }
-
-      // Safety: max 120 transactions
-      if (!endDate && transactionsToAdd.length >= 120) {
-        break;
-      }
-    }
-
-    // Add all transactions
-    if (transactionsToAdd.length > 0) {
-      setTransactions((prev) => {
-        const newTransactions = transactionsToAdd.filter(
-          (newTx) => !prev.some(
-            (t) => t.recurringId === newTx.recurringId && t.date === newTx.date
-          )
-        );
-        generatedCount = newTransactions.length;
-        if (newTransactions.length === 0) return prev;
-        
-        // Add to storage (IndexedDB)
-        newTransactions.forEach(tx => {
-          adapter?.addTransaction(tx).catch(error => {
-            console.error('[FinanceContext] Error adding generated transaction:', error);
-          });
-        });
-        
-        // Push to cloud (Supabase)
-        newTransactions.forEach(tx => {
-          syncService.pushTransaction(tx).catch(error => {
-            console.error('[FinanceContext] Error syncing generated transaction to cloud:', error);
-          });
-        });
-        
-        return [...newTransactions, ...prev];
-      });
-
-      // Update lastGenerated and nextOccurrence
-      if (transactionsToAdd.length > 0) {
-        const lastTransaction = transactionsToAdd[transactionsToAdd.length - 1];
-        const lastDate = new Date(lastTransaction.date);
-        
-        let nextDate = new Date(lastDate);
-        switch (recurring.frequency) {
-          case 'daily':
-            nextDate.setDate(nextDate.getDate() + 1);
-            break;
-          case 'weekly':
-            nextDate.setDate(nextDate.getDate() + 7);
-            break;
-          case 'biweekly':
-            nextDate.setDate(nextDate.getDate() + 14);
-            break;
-          case 'monthly':
-            nextDate.setMonth(nextDate.getMonth() + 1);
-            break;
-          case 'quarterly':
-            nextDate.setMonth(nextDate.getMonth() + 3);
-            break;
-          case 'yearly':
-            nextDate.setFullYear(nextDate.getFullYear() + 1);
-            break;
-        }
-        
-        updateRecurringTransaction(recurring.id, {
-          lastGenerated: lastTransaction.date,
-          nextOccurrence: nextDate.toISOString().split('T')[0],
-        });
-      }
-    }
-
-    console.log(`[Recurring] Generated ${generatedCount} transactions for "${recurring.title}"`);
-    return generatedCount;
-  }, [adapter, setTransactions, updateRecurringTransaction]);
-
-  const generateRecurringTransactions = useCallback((): number => {
     let totalGeneratedCount = 0;
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -816,8 +1059,8 @@ export function FinanceProvider({ children, exchangeRates = {} }: FinanceProvide
       notificationManager.checkRecurringReminders(pendingRecurring);
     }
 
-    recurringTransactions.forEach((recurring) => {
-      if (!recurring.isActive) return;
+    for (const recurring of recurringTransactions) {
+      if (!recurring.isActive) continue;
 
       const startDate = new Date(recurring.startDate);
       startDate.setHours(0, 0, 0, 0);
@@ -827,19 +1070,20 @@ export function FinanceProvider({ children, exchangeRates = {} }: FinanceProvide
         endDate.setHours(0, 0, 0, 0);
       }
 
-      // Start from nextOccurrence (which is either startDate or the next scheduled date)
+      // Start from nextOccurrence
       let currentDate = new Date(recurring.nextOccurrence);
       currentDate.setHours(0, 0, 0, 0);
 
-      // Generate all transactions from currentDate up to endDate (or reasonable limit)
+      // Generate all transactions from currentDate up to endDate (or today + 60 days)
       const transactionsToAdd: Transaction[] = [];
       
-      while (endDate ? currentDate <= endDate : true) {
-        // Create a snapshot of the current date
+      // Safety limit: generate up to 60 days from now if no endDate
+      const maxDate = endDate ? endDate : new Date(today.getTime() + 60 * 24 * 60 * 60 * 1000);
+      
+      while (currentDate <= maxDate) {
         const transactionDate = new Date(currentDate);
         const dateString = transactionDate.toISOString().split('T')[0];
 
-        // Generate transaction
         const newTransaction: Transaction = {
           id: uuidv4(),
           title: recurring.title,
@@ -876,112 +1120,149 @@ export function FinanceProvider({ children, exchangeRates = {} }: FinanceProvide
             currentDate.setFullYear(currentDate.getFullYear() + 1);
             break;
         }
-
-        // Safety check: if no endDate, stop after generating reasonable amount
-        if (!endDate && transactionsToAdd.length >= 120) {
-          break; // Max 120 transactions (10 years for monthly)
-        }
       }
 
-      // Add all transactions at once, checking for duplicates
+      // Add all transactions at once
       if (transactionsToAdd.length > 0) {
-        setTransactions((prev) => {
+        // Check Supabase for existing transactions with same recurring_id and date
+        const { data: existingTxs, error: checkError } = await supabase
+          .from('transactions')
+          .select('date')
+          .eq('user_id', user.id)
+          .eq('recurring_id', recurring.id);
+
+        if (!checkError && existingTxs) {
+          // Filter out duplicates from Supabase
+          const existingDates = new Set(existingTxs.map(t => t.date));
           const newTransactions = transactionsToAdd.filter(
-            (newTx) => !prev.some(
-              (t) => t.recurringId === newTx.recurringId && t.date === newTx.date
-            )
+            (tx) => !existingDates.has(tx.date)
           );
-          totalGeneratedCount += newTransactions.length;
-          if (newTransactions.length === 0) return prev;
           
-          // Add to storage (IndexedDB)
-          newTransactions.forEach(tx => {
-            adapter?.addTransaction(tx).catch(error => {
-              console.error('[FinanceContext] Error adding generated transaction:', error);
-            });
-          });
-          
-          // Push to cloud (Supabase)
-          newTransactions.forEach(tx => {
-            syncService.pushTransaction(tx).catch(error => {
-              console.error('[FinanceContext] Error syncing generated transaction to cloud:', error);
-            });
-          });
-          
-          return [...newTransactions, ...prev];
-        });
+          if (newTransactions.length > 0) {
+            // Insert to Supabase
+            const { error } = await supabase.from('transactions').insert(
+              newTransactions.map(tx => ({
+                id: tx.id,
+                user_id: user.id,
+                title: tx.title,
+                amount: tx.amount,
+                category: tx.category,
+                type: tx.type,
+                date: tx.date,
+                original_currency: tx.originalCurrency,
+                is_recurring: tx.isRecurring,
+                recurring_id: tx.recurringId || null,
+                description: tx.description || null,
+              }))
+            );
+
+            if (error) {
+              console.error('[FinanceContext] Error adding generated transactions:', error);
+              continue;
+            }
+
+            totalGeneratedCount += newTransactions.length;
+
+            // Update state
+            setTransactions((prev) => [...newTransactions, ...prev]);
+          }
+        }
 
         // Update lastGenerated and nextOccurrence
-        if (transactionsToAdd.length > 0) {
-          const lastTransaction = transactionsToAdd[transactionsToAdd.length - 1];
-          const lastDate = new Date(lastTransaction.date);
-          
-          // Calculate next occurrence after the last generated transaction
-          let nextDate = new Date(lastDate);
-          switch (recurring.frequency) {
-            case 'daily':
-              nextDate.setDate(nextDate.getDate() + 1);
-              break;
-            case 'weekly':
-              nextDate.setDate(nextDate.getDate() + 7);
-              break;
-            case 'biweekly':
-              nextDate.setDate(nextDate.getDate() + 14);
-              break;
-            case 'monthly':
-              nextDate.setMonth(nextDate.getMonth() + 1);
-              break;
-            case 'quarterly':
-              nextDate.setMonth(nextDate.getMonth() + 3);
-              break;
-            case 'yearly':
-              nextDate.setFullYear(nextDate.getFullYear() + 1);
-              break;
-          }
-          
-          updateRecurringTransaction(recurring.id, {
-            lastGenerated: lastTransaction.date,
-            nextOccurrence: nextDate.toISOString().split('T')[0],
-          });
+        const lastTransaction = transactionsToAdd[transactionsToAdd.length - 1];
+        const lastDate = new Date(lastTransaction.date);
+        
+        let nextDate = new Date(lastDate);
+        switch (recurring.frequency) {
+          case 'daily':
+            nextDate.setDate(nextDate.getDate() + 1);
+            break;
+          case 'weekly':
+            nextDate.setDate(nextDate.getDate() + 7);
+            break;
+          case 'biweekly':
+            nextDate.setDate(nextDate.getDate() + 14);
+            break;
+          case 'monthly':
+            nextDate.setMonth(nextDate.getMonth() + 1);
+            break;
+          case 'quarterly':
+            nextDate.setMonth(nextDate.getMonth() + 3);
+            break;
+          case 'yearly':
+            nextDate.setFullYear(nextDate.getFullYear() + 1);
+            break;
         }
+        
+        await updateRecurringTransaction(recurring.id, {
+          lastGenerated: lastTransaction.date,
+          nextOccurrence: nextDate.toISOString().split('T')[0],
+        });
       }
-    });
+    }
 
     return totalGeneratedCount;
-  }, [recurringTransactions, setTransactions, updateRecurringTransaction, notificationManager]);
+  }, [recurringTransactions, isAuthenticated, updateRecurringTransaction, notificationManager]);
 
   // Budget Management (P2 Sprint 2)
   const setBudget = useCallback(
-    (budget: Omit<CategoryBudget, 'id'>): string => {
-      if (!adapter) return '';
+    async (budget: Omit<CategoryBudget, 'id'>): Promise<string> => {
+      const user = await getCurrentUser();
+      if (!user || !isAuthenticated) {
+        console.error('[FinanceContext] Not authenticated');
+        return '';
+      }
 
       const newBudget: CategoryBudget = {
         id: uuidv4(),
         ...budget,
       };
 
-      // Update storage asynchronously
-      adapter.addBudget(newBudget).catch(error => {
-        console.error('[FinanceContext] Error adding budget:', error);
+      // Insert to Supabase
+      const { error } = await supabase.from('budgets').insert({
+        id: newBudget.id,
+        user_id: user.id,
+        category: newBudget.category,
+        monthly_limit: newBudget.monthlyLimit,
+        alert_threshold: newBudget.alertThreshold,
+        is_active: newBudget.isActive,
+        currency: newBudget.currency,
       });
+
+      if (error) {
+        console.error('[FinanceContext] Error adding budget:', error);
+        return '';
+      }
 
       // Update state immediately
       setBudgets((prev) => [...prev, newBudget]);
       return newBudget.id;
     },
-    [adapter]
+    [isAuthenticated]
   );
 
   const updateBudget = useCallback(
-    (id: string, updates: Partial<Omit<CategoryBudget, 'id'>>): boolean => {
-      if (!adapter) return false;
+    async (id: string, updates: Partial<Omit<CategoryBudget, 'id'>>): Promise<boolean> => {
+      const user = await getCurrentUser();
+      if (!user || !isAuthenticated) {
+        console.error('[FinanceContext] Not authenticated');
+        return false;
+      }
 
-      // Update storage asynchronously
-      adapter.updateBudget(id, updates).catch(error => {
+      // Update in Supabase
+      const { error } = await supabase.from('budgets').update({
+        monthly_limit: updates.monthlyLimit,
+        alert_threshold: updates.alertThreshold,
+        is_active: updates.isActive,
+        currency: updates.currency,
+      }).eq('id', id).eq('user_id', user.id);
+
+      if (error) {
         console.error('[FinanceContext] Error updating budget:', error);
-      });
+        return false;
+      }
 
-      // Update state immediately
+      // Update state
       setBudgets((prev) =>
         prev.map((budget) =>
           budget.id === id ? { ...budget, ...updates } : budget
@@ -989,46 +1270,58 @@ export function FinanceProvider({ children, exchangeRates = {} }: FinanceProvide
       );
       return true;
     },
-    [adapter]
+    [isAuthenticated]
   );
 
   const deleteBudget = useCallback(
-    (id: string) => {
-      if (!adapter) return;
+    async (id: string) => {
+      const user = await getCurrentUser();
+      if (!user || !isAuthenticated) {
+        console.error('[FinanceContext] Not authenticated');
+        return;
+      }
 
-      // Update storage asynchronously
-      adapter.deleteBudget(id).catch(error => {
+      // Delete from Supabase
+      const { error } = await supabase.from('budgets').delete().eq('id', id).eq('user_id', user.id);
+
+      if (error) {
         console.error('[FinanceContext] Error deleting budget:', error);
-      });
+        return;
+      }
 
-      // Update state immediately
+      // Update state
       setBudgets((prev) => prev.filter((budget) => budget.id !== id));
     },
-    [adapter]
+    [isAuthenticated]
   );
 
   const toggleBudgetActive = useCallback(
-    (id: string) => {
-      if (!adapter) return;
+    async (id: string) => {
+      const user = await getCurrentUser();
+      if (!user || !isAuthenticated) {
+        console.error('[FinanceContext] Not authenticated');
+        return;
+      }
 
-      setBudgets((prev) => {
-        const updated = prev.map((budget) => {
-          if (budget.id === id) {
-            const toggled = { ...budget, isActive: !budget.isActive };
-            
-            // Update storage asynchronously
-            adapter.updateBudget(id, { isActive: toggled.isActive }).catch(error => {
-              console.error('[FinanceContext] Error toggling budget:', error);
-            });
-            
-            return toggled;
-          }
-          return budget;
-        });
-        return updated;
-      });
+      const budget = budgets.find(b => b.id === id);
+      if (!budget) return;
+
+      const newIsActive = !budget.isActive;
+
+      // Update in Supabase
+      const { error } = await supabase.from('budgets').update({ is_active: newIsActive }).eq('id', id).eq('user_id', user.id);
+
+      if (error) {
+        console.error('[FinanceContext] Error toggling budget:', error);
+        return;
+      }
+
+      // Update state
+      setBudgets((prev) =>
+        prev.map((b) => (b.id === id ? { ...b, isActive: newIsActive } : b))
+      );
     },
-    [adapter]
+    [budgets, isAuthenticated]
   );
 
   const getBudgetProgress = useCallback(
@@ -1127,9 +1420,10 @@ export function FinanceProvider({ children, exchangeRates = {} }: FinanceProvide
 
   // Cloud sync actions (P3 Sprint 2)
   const syncNow = useCallback(async (): Promise<SyncResult> => {
-    console.log('🔄 [FinanceContext] syncNow called:', { isAuthenticated, isCloudEnabled, hasAdapter: !!adapter });
+    const user = await getCurrentUser();
+    console.log('🔄 [FinanceContext] syncNow called:', { isAuthenticated, isCloudEnabled, userId: user?.id });
     
-    if (!isAuthenticated || !isCloudEnabled) {
+    if (!user || !isAuthenticated || !isCloudEnabled) {
       console.warn('⚠️ [FinanceContext] Sync skipped - not authenticated or cloud disabled');
       return {
         success: false,
@@ -1139,22 +1433,79 @@ export function FinanceProvider({ children, exchangeRates = {} }: FinanceProvide
       };
     }
 
-    const result = await syncService.syncAll();
-    console.log('✅ [FinanceContext] Sync completed, reloading transactions...', result);
-    
-    // Always reload data from IndexedDB after sync attempt
-    if (adapter) {
-      try {
-        const txs = await adapter.getAllTransactions();
-        console.log(`📊 [FinanceContext] Loaded ${txs.length} transactions from IndexedDB`);
-        setTransactions(txs);
-      } catch (error) {
-        console.error('❌ [FinanceContext] Failed to reload transactions:', error);
+    // Since we're using Supabase directly now, reload data from Supabase
+    try {
+      const [{ data: txs }, { data: budgets }, { data: recurring }] = await Promise.all([
+        supabase.from('transactions').select('*').eq('user_id', user.id),
+        supabase.from('budgets').select('*').eq('user_id', user.id),
+        supabase.from('recurring_transactions').select('*').eq('user_id', user.id),
+      ]);
+
+      if (txs) {
+        const mapped = txs.map(tx => ({
+          id: tx.id,
+          title: tx.title,
+          amount: tx.amount,
+          category: tx.category,
+          type: tx.type,
+          date: tx.date,
+          originalCurrency: tx.original_currency,
+          isRecurring: tx.is_recurring,
+          recurringId: tx.recurring_id,
+          description: tx.description,
+        }));
+        setTransactions(mapped);
+        console.log(`📊 [FinanceContext] Loaded ${mapped.length} transactions from Supabase`);
       }
+
+      if (budgets) {
+        const mapped = budgets.map(b => ({
+          id: b.id,
+          category: b.category,
+          monthlyLimit: b.monthly_limit,
+          alertThreshold: b.alert_threshold,
+          isActive: b.is_active,
+          currency: b.currency,
+        }));
+        setBudgets(mapped);
+      }
+
+      if (recurring) {
+        const mapped = recurring.map(r => ({
+          id: r.id,
+          title: r.title,
+          amount: r.amount,
+          category: r.category,
+          type: r.type,
+          frequency: r.frequency,
+          startDate: r.start_date,
+          endDate: r.end_date,
+          lastGenerated: r.last_generated,
+          nextOccurrence: r.next_occurrence,
+          isActive: r.is_active,
+          description: r.description,
+          originalCurrency: r.original_currency,
+        }));
+        setRecurringTransactions(mapped);
+      }
+
+      console.log('✅ [FinanceContext] Sync completed successfully');
+      return {
+        success: true,
+        synced: (txs?.length || 0) + (budgets?.length || 0) + (recurring?.length || 0),
+        conflicts: 0,
+        errors: [],
+      };
+    } catch (error) {
+      console.error('❌ [FinanceContext] Sync failed:', error);
+      return {
+        success: false,
+        synced: 0,
+        conflicts: 0,
+        errors: [error instanceof Error ? error.message : 'Unknown sync error'],
+      };
     }
-    
-    return result;
-  }, [isAuthenticated, isCloudEnabled, adapter]);
+  }, [isAuthenticated, isCloudEnabled]);
 
   const handleAutoSyncChange = useCallback((enabled: boolean) => {
     setAutoSync(enabled);
@@ -1163,11 +1514,14 @@ export function FinanceProvider({ children, exchangeRates = {} }: FinanceProvide
 
   // Subscribe to sync status changes
   useEffect(() => {
-    const unsubscribe = syncService.onSyncStatusChange((status) => {
-      setSyncStatus(status);
+    // Since we're using Supabase directly now, we don't need to subscribe to syncService
+    // Just mark sync status as idle
+    setSyncStatus({
+      isSyncing: false,
+      lastSyncTime: null,
+      error: null,
     });
-    
-    return unsubscribe;
+    return;
   }, []);
 
   // Auto-sync on mount if authenticated
@@ -1177,50 +1531,16 @@ export function FinanceProvider({ children, exchangeRates = {} }: FinanceProvide
       isCloudEnabled, 
       autoSync, 
       isLoading,
-      hasAdapter: !!adapter 
     });
     
-    if (isAuthenticated && isCloudEnabled && autoSync && !isLoading && adapter) {
+    if (isAuthenticated && isCloudEnabled && autoSync && !isLoading) {
       console.log('🚀 [FinanceContext] Triggering auto-sync in 500ms...');
       // Short delay to ensure UI is ready
       const timer = setTimeout(async () => {
         console.log('⏱️ [FinanceContext] Executing auto-sync now...');
         try {
-          const result = await syncService.syncAll();
+          const result = await syncNow();
           console.log('✅ [FinanceContext] Sync completed:', result);
-          
-          // Wait for IndexedDB writes to complete
-          await new Promise(resolve => setTimeout(resolve, 200));
-          
-          // Force reload ALL data from storage
-          if (adapter) {
-            console.log('🔄 [FinanceContext] Reloading ALL data from IndexedDB...');
-            
-            try {
-              const [txs, bdgs, recur, sett] = await Promise.all([
-                adapter.getAllTransactions(),
-                adapter.getAllBudgets(),
-                adapter.getAllRecurring(),
-                adapter.getSettings()
-              ]);
-              
-              console.log(`📊 [FinanceContext] Loaded from IndexedDB:`, {
-                transactions: txs.length,
-                budgets: bdgs.length,
-                recurring: recur.length
-              });
-              
-              // Force state update
-              setTransactions(txs);
-              setBudgets(bdgs);
-              setRecurringTransactions(recur);
-              setSettings(sett);
-              
-              console.log('✅ [FinanceContext] State updated successfully!');
-            } catch (error) {
-              console.error('❌ [FinanceContext] Failed to reload data:', error);
-            }
-          }
         } catch (error) {
           console.error('❌ [FinanceContext] Auto-sync error:', error);
         }
@@ -1233,7 +1553,7 @@ export function FinanceProvider({ children, exchangeRates = {} }: FinanceProvide
     } else {
       console.log('⏭️ [FinanceContext] Auto-sync skipped');
     }
-  }, [isAuthenticated, isCloudEnabled, autoSync, isLoading, adapter]);
+  }, [isAuthenticated, isCloudEnabled, autoSync, isLoading, syncNow]);
 
   const value: FinanceContextType = {
     transactions,

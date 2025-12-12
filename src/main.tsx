@@ -4,6 +4,9 @@ import './index.css'
 import App from './App.tsx'
 import { AuthProvider } from './context/AuthContext'
 
+// Import development utilities
+import './utils/devUtils'
+
 // Import security tests for browser console access
 import './tests/security.test'
 

@@ -113,13 +113,15 @@ export function TransactionsPage({ language, currency }: TransactionsPageProps) 
     setEditingTransaction(transaction);
   };
 
-  const handleUpdate = (data: Omit<Transaction, 'id'>) => {
+  const handleUpdate = async (data: Omit<Transaction, 'id'>) => {
     if (editingTransaction) {
-      const ok = updateTransaction(editingTransaction.id, data);
+      const ok = await updateTransaction(editingTransaction.id, data);
       if (ok !== false) {
         setEditingTransaction(undefined);
       }
+      return ok;
     }
+    return false;
   };
 
   const clearFilters = () => {

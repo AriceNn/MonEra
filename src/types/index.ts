@@ -55,6 +55,8 @@ export interface AppSettings {
   language: 'tr' | 'en';
   theme: 'light' | 'dark';
   inflationRate: number; // Annual % estimate for real return calculation
+  notificationsEnabled?: boolean;
+  notificationSound?: boolean;
 }
 
 // Dashboard Summary (Calculated Data)
@@ -94,6 +96,8 @@ export const DEFAULT_SETTINGS: AppSettings = {
   language: 'tr',
   theme: 'light',
   inflationRate: 30.0,
+  notificationsEnabled: true,
+  notificationSound: true,
 };
 
 // Transaction Categories
