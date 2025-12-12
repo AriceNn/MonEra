@@ -10,6 +10,7 @@ interface ChartsProps {
   transactions: Transaction[];
   currency: string;
   language: 'tr' | 'en';
+  theme?: 'light' | 'dark';
   selectedMonth?: number;
   selectedYear?: number;
 }
@@ -33,24 +34,33 @@ const TOOLTIP_STYLE = {
   boxShadow: '0 4px 6px rgba(0,0,0,0.3)'
 };
 
-export function Charts({ transactions, currency, language, selectedMonth = 0, selectedYear = 2024 }: ChartsProps) {
-  // Custom bar label that formats to currency (2 decimals)
+export function Charts({ transactions, currency, language, theme = 'light', selectedMonth = 0, selectedYear = 2024 }: ChartsProps) {
+  // Custom bar label that formats to currency (2 decimals) - only shows if value > 0
   const renderBarLabel = (props: any) => {
     const { x, y, value, width } = props;
+    const numValue = Number(value || 0);
+    
+    // Don't render label if value is 0 or negligible
+    if (numValue < 0.01) return null;
+    
     const cx = x + (width || 0) / 2;
+    const labelColor = theme === 'dark' ? '#cbd5e1' : '#475569';
+    
     return (
       <text
         x={cx}
         y={(y || 0) - 4}
-        fill="#64748b"
+        fill={labelColor}
         fontSize={10}
         style={{ fontWeight: 600 }}
         textAnchor="middle"
       >
-        {formatCurrency(Number(value || 0), currency as any)}
+        {formatCurrency(numValue, currency as any)}
       </text>
     );
   };
+  
+  // IMPORTANT: All hooks must be called before any conditional returns
   // Calculate monthly data - all months
   const { monthlyList, monthlyMap } = useMemo(() => {
     const dataByMonth: Record<string, { income: number; expense: number; savings: number; month: string }> = {};
@@ -120,6 +130,38 @@ export function Charts({ transactions, currency, language, selectedMonth = 0, se
     });
   }, [monthlyList]);
 
+  // Prepare pie chart data
+  const pieData = useMemo(() => {
+    const data = [];
+    
+    if (selectedMonthData.income > 0) {
+      data.push({
+        name: language === 'tr' ? 'Gelir' : 'Income',
+        value: selectedMonthData.income
+      });
+    }
+    if (selectedMonthData.expense > 0) {
+      data.push({
+        name: language === 'tr' ? 'Gider' : 'Expense',
+        value: selectedMonthData.expense
+      });
+    }
+    if (selectedMonthData.savings > 0) {
+      data.push({
+        name: language === 'tr' ? 'Tasarruf' : 'Savings',
+        value: selectedMonthData.savings
+      });
+    } else if (selectedMonthData.savings < 0) {
+      data.push({
+        name: language === 'tr' ? 'Tasarruftan Çıkış' : 'Withdrawal',
+        value: Math.abs(selectedMonthData.savings)
+      });
+    }
+    
+    return data;
+  }, [selectedMonthData, language]);
+
+  // NOW we can do conditional rendering after all hooks have been called
   if (transactions.length === 0) {
     return (
       <Card className="p-8 text-center">
@@ -199,86 +241,53 @@ export function Charts({ transactions, currency, language, selectedMonth = 0, se
           {language === 'tr' ? 'Gelir/Gider/Tasarruf Oranı' : 'Income/Expense/Savings Ratio'}
         </h3>
         <ResponsiveContainer width="100%" height={220}>
-          {useMemo(() => {
-            const pieData = [];
-            
-            if (selectedMonthData.income > 0) {
-              pieData.push({
-                name: language === 'tr' ? 'Gelir' : 'Income',
-                value: selectedMonthData.income
-              });
-            }
-            if (selectedMonthData.expense > 0) {
-              pieData.push({
-                name: language === 'tr' ? 'Gider' : 'Expense',
-                value: selectedMonthData.expense
-              });
-            }
-            if (selectedMonthData.savings > 0) {
-              pieData.push({
-                name: language === 'tr' ? 'Tasarruf' : 'Savings',
-                value: selectedMonthData.savings
-              });
-            } else if (selectedMonthData.savings < 0) {
-              pieData.push({
-                name: language === 'tr' ? 'Tasarruftan Çıkış' : 'Withdrawal',
-                value: Math.abs(selectedMonthData.savings)
-              });
-            }
+          <PieChart margin={{ top: 12, right: 12, left: 12, bottom: 12 }}>
+            <Pie
+              data={pieData}
+              cx="50%"
+              cy="50%"
+              label={({ cx, cy, midAngle, outerRadius, name, percent }: any) => {
+                const RADIAN = Math.PI / 180;
+                const radius = outerRadius + 30;
+                const x = cx + radius * Math.cos(-midAngle * RADIAN);
+                const y = cy + radius * Math.sin(-midAngle * RADIAN);
 
-            const renderLabel = ({ cx, cy, midAngle, outerRadius, name, percent }: any) => {
-              const RADIAN = Math.PI / 180;
-              const radius = outerRadius + 30;
-              const x = cx + radius * Math.cos(-midAngle * RADIAN);
-              const y = cy + radius * Math.sin(-midAngle * RADIAN);
-
-              return (
-                <text 
-                  x={x} 
-                  y={y} 
-                  fill="#0f172a"
-                  textAnchor={x > cx ? 'start' : 'end'} 
-                  dominantBaseline="central"
-                  className="text-xs font-medium dark:fill-white"
-                  fontSize={10}
-                >
-                  {`${name} ${((percent || 0) * 100).toFixed(0)}%`}
-                </text>
-              );
-            };
-
-            return (
-              <PieChart margin={{ top: 12, right: 12, left: 12, bottom: 12 }} key="pie-chart-inner">
-                <Pie
-                  key={`pie-${language}`}
-                  data={pieData}
-                  cx="50%"
-                  cy="50%"
-                  label={renderLabel}
-                  outerRadius={80}
-                  fill="#8884d8"
-                  dataKey="value"
-                  isAnimationActive={false}
-                >
-                  {pieData.map((entry, index) => (
-                    <Cell 
-                      fill={
-                        entry.name === (language === 'tr' ? 'Gelir' : 'Income') ? COLORS.income :
-                        entry.name === (language === 'tr' ? 'Gider' : 'Expense') ? COLORS.expense :
-                        entry.name === (language === 'tr' ? 'Tasarruf' : 'Savings') ? COLORS.savings :
-                        '#f97316'
-                      }
-                      key={`cell-${index}-${language}`}
-                    />
-                  ))}
-                </Pie>
-                <Tooltip
-                  contentStyle={TOOLTIP_STYLE}
-                  formatter={(value: number) => formatCurrency(value, currency as any)}
+                return (
+                  <text 
+                    x={x} 
+                    y={y} 
+                    fill="#0f172a"
+                    textAnchor={x > cx ? 'start' : 'end'} 
+                    dominantBaseline="central"
+                    className="text-xs font-medium dark:fill-white"
+                    fontSize={10}
+                  >
+                    {`${name} ${((percent || 0) * 100).toFixed(0)}%`}
+                  </text>
+                );
+              }}
+              outerRadius={80}
+              fill="#8884d8"
+              dataKey="value"
+              isAnimationActive={false}
+            >
+              {pieData.map((entry, index) => (
+                <Cell 
+                  fill={
+                    entry.name === (language === 'tr' ? 'Gelir' : 'Income') ? COLORS.income :
+                    entry.name === (language === 'tr' ? 'Gider' : 'Expense') ? COLORS.expense :
+                    entry.name === (language === 'tr' ? 'Tasarruf' : 'Savings') ? COLORS.savings :
+                    '#f97316'
+                  }
+                  key={`cell-${index}`}
                 />
-              </PieChart>
-            );
-          }, [selectedMonthData, language, currency])}
+              ))}
+            </Pie>
+            <Tooltip
+              contentStyle={TOOLTIP_STYLE}
+              formatter={(value: number) => formatCurrency(value, currency as any)}
+            />
+          </PieChart>
         </ResponsiveContainer>
       </Card>
     </div>

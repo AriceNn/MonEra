@@ -23,21 +23,23 @@ export function RecentTransactions({
   onEdit,
   limit = 5,
 }: RecentTransactionsProps) {
-  const recent = transactions.slice(0, limit);
+  try {
+    const recent = transactions && Array.isArray(transactions) ? transactions.slice(0, limit) : [];
 
-  if (recent.length === 0) {
+    if (recent.length === 0) {
+      return (
+        <Card className="p-8 text-center">
+          <p className="text-slate-500 dark:text-slate-400">{t('noTransactions', language as 'tr' | 'en')}</p>
+        </Card>
+      );
+    }
+
     return (
-      <Card className="p-8 text-center">
-        <p className="text-slate-500 dark:text-slate-400">{t('noTransactions', language as 'tr' | 'en')}</p>
-      </Card>
-    );
-  }
-
-  return (
-    <Card className="p-4">
-      <h3 className="text-base font-semibold text-slate-900 dark:text-white mb-4">{language === 'tr' ? 'Son İşlemler' : 'Recent Transactions'}</h3>
-      <div className="space-y-3">
-        {recent.map((transaction) => {
+      <Card className="p-4">
+        <h3 className="text-base font-semibold text-slate-900 dark:text-white mb-4">{language === 'tr' ? 'Son İşlemler' : 'Recent Transactions'}</h3>
+        <div className="space-y-3">
+          {recent.map((transaction) => {
+            if (!transaction) return null;
           const originalCurrency = ((transaction as any).originalCurrency as string | undefined) || 'TRY';
           const amountDisplay = originalCurrency !== currency
             ? convertCurrency(transaction.amount, originalCurrency, currency)
@@ -108,5 +110,13 @@ export function RecentTransactions({
         )})}
       </div>
     </Card>
-  );
+    );
+  } catch (error) {
+    console.error('RecentTransactions error:', error);
+    return (
+      <Card className="p-8 text-center">
+        <p className="text-red-500">{language === 'tr' ? 'İşlemler yüklenemedi' : 'Failed to load transactions'}</p>
+      </Card>
+    );
+  }
 }

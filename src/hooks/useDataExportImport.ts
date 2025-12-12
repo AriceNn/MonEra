@@ -51,16 +51,9 @@ export function useDataExportImport() {
         };
       }
 
-      if (!data.settings || typeof data.settings !== 'object') {
-        return {
-          success: false,
-          message: 'Invalid JSON: missing or invalid settings',
-        };
-      }
-
-      // Validate transaction structure
+      // Validate transaction structure - less strict for imports
       const validTransactions = data.transactions.every(
-        (t) => t.id && t.title && typeof t.amount === 'number' && t.category && t.date && t.type
+        (t) => t.title && typeof t.amount === 'number' && t.category && t.date && t.type
       );
 
       if (!validTransactions) {
@@ -162,9 +155,52 @@ export function useDataExportImport() {
     }
   }, []);
 
+  /**
+   * Export transactions to CSV format
+   */
+  const transactionsToCSV = useCallback((transactions: Transaction[]): string => {
+    if (transactions.length === 0) return '';
+    
+    // Header row
+    const headers = ['title', 'amount', 'category', 'date', 'type', 'description', 'originalCurrency'];
+    const headerRow = headers.join(',');
+    
+    // Data rows
+    const dataRows = transactions.map((t) => {
+      return [
+        `"${t.title.replace(/"/g, '""')}"`, // Escape quotes
+        t.amount,
+        t.category,
+        t.date,
+        t.type,
+        t.description ? `"${t.description.replace(/"/g, '""')}"` : '',
+        (t as any).originalCurrency || 'TRY',
+      ].join(',');
+    });
+    
+    return [headerRow, ...dataRows].join('\n');
+  }, []);
+
+  /**
+   * Download CSV file to user's computer
+   */
+  const downloadCSV = useCallback((transactions: Transaction[], filename = 'fintrack-data.csv'): void => {
+    const csvData = transactionsToCSV(transactions);
+    const blob = new Blob([csvData], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  }, [transactionsToCSV]);
+
   return {
     exportToJSON,
     downloadJSON,
+    downloadCSV,
     importFromJSON,
     importFromCSV,
   };

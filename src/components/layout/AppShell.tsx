@@ -10,6 +10,8 @@ interface AppShellProps {
   onLanguageToggle: () => void;
   onCurrencyToggle?: () => void;
   onSettingsClick?: () => void;
+  ratesUpdatedAt?: string;
+  currentRate?: { rate: number; base: string; quote: string };
 }
 
 export function AppShell({
@@ -21,8 +23,19 @@ export function AppShell({
   onLanguageToggle,
   onCurrencyToggle,
   onSettingsClick,
+  ratesUpdatedAt,
+  currentRate,
 }: AppShellProps) {
   const isDark = theme === 'dark';
+  
+  const formatTime = (dateStr?: string) => {
+    if (!dateStr) return '';
+    const date = new Date(dateStr);
+    return date.toLocaleTimeString(language === 'tr' ? 'tr-TR' : 'en-US', { 
+      hour: '2-digit', 
+      minute: '2-digit' 
+    });
+  };
 
   return (
     <div className={isDark ? 'dark' : ''}>
@@ -37,7 +50,7 @@ export function AppShell({
 
             {/* Right-side Controls */}
             <div className="flex items-center gap-1">
-              {/* Currency Toggle (TRY/USD) */}
+              {/* Currency Toggle */}
               <button
                 onClick={onCurrencyToggle}
                 className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors text-slate-700 dark:text-slate-300"
@@ -78,6 +91,18 @@ export function AppShell({
               >
                 <Settings className="w-5 h-5 text-slate-600 dark:text-slate-400" />
               </button>
+
+              {/* Rates Info Chip - Hidden on mobile */}
+              {ratesUpdatedAt && (
+                <span className="hidden md:inline-block ml-2 px-3 py-1.5 text-xs rounded-md bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300 font-medium">
+                  {language === 'tr' ? 'Güncelleme: ' : 'Updated: '}{formatTime(ratesUpdatedAt)}
+                  {currentRate && (
+                    <span className="ml-2 opacity-90">
+                      (1 {currentRate.base} = {currentRate.rate.toFixed(2)} {currentRate.quote})
+                    </span>
+                  )}
+                </span>
+              )}
             </div>
           </header>
 

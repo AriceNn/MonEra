@@ -19,22 +19,32 @@ export function calculateTotalExpense(transactions: Transaction[]): number {
 }
 
 /**
- * Calculate total savings from transactions (savings - withdrawals)
+ * Calculate total savings (only savings transactions)
  */
 export function calculateTotalSavings(transactions: Transaction[]): number {
-  const savings = transactions
+  return transactions
     .filter((t) => t.type === 'savings')
     .reduce((sum, t) => sum + t.amount, 0);
-  
-  const withdrawals = transactions
-    .filter((t) => t.type === 'withdrawal')
-    .reduce((sum, t) => sum + t.amount, 0);
-  
-  return savings - withdrawals;
 }
 
 /**
- * Calculate cumulative savings up to given month/year (for wealth card)
+ * Calculate total withdrawals (only withdrawal transactions)
+ */
+export function calculateTotalWithdrawals(transactions: Transaction[]): number {
+  return transactions
+    .filter((t) => t.type === 'withdrawal')
+    .reduce((sum, t) => sum + t.amount, 0);
+}
+
+/**
+ * Calculate net savings (savings - withdrawals)
+ */
+export function calculateNetSavings(transactions: Transaction[]): number {
+  return calculateTotalSavings(transactions) - calculateTotalWithdrawals(transactions);
+}
+
+/**
+ * Calculate cumulative net savings up to given month/year (for wealth card)
  */
 export function calculateCumulativeSavings(transactions: Transaction[], upToMonth: number, upToYear: number): number {
   const relevantTransactions = transactions.filter((t) => {
@@ -48,14 +58,22 @@ export function calculateCumulativeSavings(transactions: Transaction[], upToMont
     return false;
   });
   
-  return calculateTotalSavings(relevantTransactions);
+  return calculateNetSavings(relevantTransactions);
 }
 
 /**
- * Calculate monthly cash balance (income - expense - savings for that month only)
+ * Calculate monthly cash balance (income - expense - savings + withdrawals)
  */
 export function calculateCashBalance(transactions: Transaction[]): number {
-  return calculateTotalIncome(transactions) - calculateTotalExpense(transactions) - calculateTotalSavings(transactions);
+  // Cash balance = income - expense - savings + withdrawals
+  // When you save money, it leaves your cash balance
+  // When you withdraw from savings, it returns to cash balance
+  const income = calculateTotalIncome(transactions);
+  const expense = calculateTotalExpense(transactions);
+  const savings = calculateTotalSavings(transactions);
+  const withdrawals = calculateTotalWithdrawals(transactions);
+  
+  return income - expense - savings + withdrawals;
 }
 
 /**
@@ -72,9 +90,11 @@ export function calculateNetWorth(transactions: Transaction[], upToMonth: number
  */
 export function calculateSavingsRate(transactions: Transaction[]): number {
   const totalIncome = calculateTotalIncome(transactions);
-  const totalSavings = calculateTotalSavings(transactions);
+  const totalExpense = calculateTotalExpense(transactions);
   if (totalIncome === 0) return 0;
-  return (totalSavings / totalIncome) * 100;
+  // Savings rate defined as (Income - Expense) / Income * 100
+  const savingsPortion = totalIncome - totalExpense;
+  return (savingsPortion / totalIncome) * 100;
 }
 
 /**
@@ -96,7 +116,7 @@ export function calculateRealWealth(
 export function generateFinancialSummary(transactions: Transaction[], month: number, year: number): FinancialSummary {
   const totalIncome = calculateTotalIncome(transactions);
   const totalExpense = calculateTotalExpense(transactions);
-  const totalSavings = calculateTotalSavings(transactions);
+  const totalSavings = calculateNetSavings(transactions); // Net savings (savings - withdrawals)
   const cashBalance = calculateCashBalance(transactions);
   const netWorth = calculateNetWorth(transactions, month, year); // Cumulative
   
@@ -139,4 +159,79 @@ export function groupTransactionsByCategory(
     },
     {} as Record<string, Transaction[]>
   );
+}
+
+/**
+ * P1: Calculate real wealth by month (inflation-adjusted)
+ * Real Value = Nominal Value / (1 + inflation_rate)^years_since_month
+ */
+export function calculateRealWealthByMonth(
+  transactions: Transaction[],
+  month: number,
+  year: number,
+  inflationRate: number,
+  currentYear: number,
+  currentMonth: number
+): number {
+  const nominalWealth = calculateNetWorth(transactions, month, year);
+  const yearsPassed = currentYear - year + (currentMonth - month) / 12;
+  if (yearsPassed <= 0) return nominalWealth;
+  return calculateRealWealth(nominalWealth, inflationRate, yearsPassed);
+}
+
+/**
+ * P1: Calculate expenses by category
+ */
+export interface CategoryExpenseData { category: string; amount: number; percentage: number; }
+export function calculateExpensesByCategory(transactions: Transaction[]): CategoryExpenseData[] {
+  const expenses = transactions.filter((t) => t.type === 'expense');
+  const totalExpenses = expenses.reduce((sum, t) => sum + t.amount, 0);
+  if (totalExpenses === 0) return [];
+
+  const grouped = groupTransactionsByCategory(expenses);
+  return Object.entries(grouped)
+    .map(([category, items]) => {
+      const amount = items.reduce((sum, t) => sum + t.amount, 0);
+      return { category, amount, percentage: (amount / totalExpenses) * 100 };
+    })
+    .sort((a, b) => b.amount - a.amount);
+}
+
+/**
+ * P1: Filter transactions by criteria
+ */
+export interface FilterCriteria {
+  startDate?: string;
+  endDate?: string;
+  category?: string;
+  type?: Transaction['type'];
+}
+export function filterTransactionsByCriteria(transactions: Transaction[], criteria: FilterCriteria): Transaction[] {
+  return transactions.filter((t) => {
+    if (criteria.startDate && t.date < criteria.startDate) return false;
+    if (criteria.endDate && t.date > criteria.endDate) return false;
+    if (criteria.category && t.category !== criteria.category) return false;
+    if (criteria.type && t.type !== criteria.type) return false;
+    return true;
+  });
+}
+
+/**
+ * P1: Format transactions as CSV string
+ */
+export function transactionsToCSV(transactions: Transaction[], language: 'tr' | 'en'): string {
+  const headers = language === 'tr'
+    ? ['Başlık', 'Tutar', 'Kategori', 'Tarih', 'Tür', 'Açıklama']
+    : ['Title', 'Amount', 'Category', 'Date', 'Type', 'Description'];
+
+  const rows = transactions.map((t) => [
+    `"${t.title.replace(/"/g, '""')}"`,
+    t.amount,
+    t.category,
+    t.date,
+    t.type,
+    `"${(t.description || '').replace(/"/g, '""')}"`,
+  ]);
+
+  return [headers.join(','), ...rows.map((row) => row.join(','))].join('\n');
 }

@@ -17,6 +17,7 @@ export const translations = {
     expense: 'Gider',
     netWorth: 'Net Değer',
     saveRate: 'Tasarruf Oranı',
+    totalAssets: 'Toplam Varlık',
     
     // Charts
     wealth: 'Servet',
@@ -140,6 +141,7 @@ export const translations = {
     expense: 'Expense',
     netWorth: 'Net Worth',
     saveRate: 'Save Rate',
+    totalAssets: 'Total Assets',
     
     // Charts
     wealth: 'Wealth',

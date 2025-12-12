@@ -14,9 +14,13 @@ export interface Transaction {
   originalCurrency: 'TRY' | 'USD' | 'EUR' | 'GBP'; // Currency when transaction was created
 }
 
+// Currency Pair Type
+export type CurrencyPair = 'TRY-USD' | 'USD-TRY' | 'EUR-USD' | 'USD-EUR' | 'TRY-EUR' | 'EUR-TRY' | 'GBP-USD' | 'USD-GBP';
+
 // Global Application Settings
 export interface AppSettings {
   currency: 'TRY' | 'USD' | 'EUR' | 'GBP';
+  currencyPair?: CurrencyPair; // Display currency pair for rates
   language: 'tr' | 'en';
   theme: 'light' | 'dark';
   inflationRate: number; // Annual % estimate for real return calculation
@@ -55,6 +59,7 @@ export interface ExportedData {
 // Default Settings
 export const DEFAULT_SETTINGS: AppSettings = {
   currency: 'TRY',
+  currencyPair: 'TRY-USD',
   language: 'tr',
   theme: 'light',
   inflationRate: 30.0,

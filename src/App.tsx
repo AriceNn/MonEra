@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import type { Transaction } from './types';
 import { FinanceProvider } from './context/FinanceContext';
 import { useFinance } from './hooks/useFinance';
@@ -10,10 +10,14 @@ import { Charts } from './components/dashboard/Charts';
 import { TransactionForm } from './components/transactions/TransactionForm';
 import { SettingsPage } from './pages/SettingsPage';
 import { generateFinancialSummary } from './utils/calculations';
-import { convertCurrency, fetchLatestRates, updateExchangeRates } from './utils/exchange';
+import { convertCurrency, fetchLatestRates, updateExchangeRates, loadPersistedRates } from './utils/exchange';
 import './index.css';
 
-function DashboardContent() {
+interface DashboardContentProps {
+  onRatesUpdate: (rates: Record<string, number>) => void;
+}
+
+function DashboardContent({ onRatesUpdate }: DashboardContentProps) {
   const { transactions, settings, addTransaction, deleteTransaction, updateTransaction, updateSettings } = useFinance();
   const [editingTransaction, setEditingTransaction] = useState<Transaction | undefined>(undefined);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -41,14 +45,26 @@ function DashboardContent() {
     setSelectedYear(year);
   };
 
+  // Wrap addTransaction to automatically switch to the transaction's month
+  const handleAddTransaction = useCallback((transaction: Omit<Transaction, 'id'>) => {
+    const result = addTransaction(transaction);
+    if (result) {
+      // If transaction added successfully, switch to that transaction's month
+      const txDate = new Date(transaction.date);
+      setSelectedMonth(txDate.getMonth());
+      setSelectedYear(txDate.getFullYear());
+    }
+    return result;
+  }, [addTransaction]);
+
   // Helper: Convert transaction amount to current display currency
-  const getDisplayAmount = (transaction: Transaction): number => {
+  const getDisplayAmount = useCallback((transaction: Transaction): number => {
     if ((transaction as any).originalCurrency === settings.currency) {
       return transaction.amount;
     }
     const from = (transaction as any).originalCurrency || 'TRY';
     return convertCurrency(transaction.amount, from, settings.currency);
-  };
+  }, [settings.currency]);
 
   // Filter transactions by selected month/year
   const filteredTransactions = useMemo(() => {
@@ -80,26 +96,83 @@ function DashboardContent() {
       }
     });
     return cumulative;
-  }, [transactions, selectedMonth, selectedYear, settings.currency]);
+  }, [transactions, selectedMonth, selectedYear, getDisplayAmount]);
 
   // Calculate summary for filtered transactions
   const summary = useMemo(() => {
     const converted = filteredTransactions.map((t) => ({ ...t, amount: getDisplayAmount(t) }));
     return generateFinancialSummary(converted, selectedMonth, selectedYear);
-  }, [filteredTransactions, selectedMonth, selectedYear, settings.currency]);
+  }, [filteredTransactions, selectedMonth, selectedYear, getDisplayAmount]);
 
-  // Fetch latest exchange rates on load and when currency changes; refresh every 6 hours
+  // State to trigger re-render when rates are loaded
+  const [ratesLoaded, setRatesLoaded] = useState(false);
+
+  // Fetch latest rates on initial mount and when currency changes
   useEffect(() => {
     let cancelled = false;
-    const loadRates = async () => {
+    
+    const fetchRates = async () => {
+      // First, load any cached rates immediately for instant display
+      const cached = loadPersistedRates();
+      if (cached) {
+        setRatesLoaded(true);
+      }
+      
+      // Then fetch fresh rates from API
       const base = settings.currency || 'USD';
+      console.log('[App] Fetching fresh rates on mount/currency change');
       const rates = await fetchLatestRates(base);
-      if (!cancelled) updateExchangeRates(rates);
+      if (!cancelled) {
+        updateExchangeRates(rates);
+        onRatesUpdate(rates); // Update parent state
+        setRatesLoaded(true); // Trigger re-render with fresh data
+      }
     };
-    loadRates();
-    const interval = setInterval(loadRates, 6 * 60 * 60 * 1000);
-    return () => { cancelled = true; clearInterval(interval); };
+    
+    fetchRates();
+    return () => { cancelled = true; };
   }, [settings.currency]);
+
+  // Get current exchange rate for display based on selected currency pair
+  const currentRate = useMemo(() => {
+    if (!ratesLoaded) return undefined; // Wait for rates to load
+    
+    try {
+      const stored = window.localStorage.getItem('fintrack_exchange_rates');
+      if (!stored) return undefined;
+      const data = JSON.parse(stored);
+      
+      const pair = settings.currencyPair || 'TRY-USD';
+      const [base, quote] = pair.split('-') as [string, string];
+      
+      console.log('[currentRate] Currency pair:', pair, 'Base:', base, 'Quote:', quote);
+      console.log('[currentRate] Stored rates:', data.rates);
+      
+      const baseRate = data.rates?.[base] || 1;
+      const quoteRate = data.rates?.[quote] || 1;
+      
+      // Calculate: 1 BASE = ? QUOTE
+      const rate = quoteRate / baseRate;
+      
+      console.log('[currentRate] Rate:', `1 ${base} = ${rate} ${quote}`);
+      return { rate, base, quote };
+    } catch (err) {
+      console.error('[currentRate] Error:', err);
+      return undefined;
+    }
+  }, [settings.currency, settings.currencyPair, ratesLoaded]);
+
+  const ratesUpdatedAt = useMemo(() => {
+    if (!ratesLoaded) return undefined; // Wait for rates to load
+    
+    try {
+      const stored = window.localStorage.getItem('fintrack_exchange_rates');
+      if (!stored) return undefined;
+      return JSON.parse(stored).updatedAt;
+    } catch {
+      return undefined;
+    }
+  }, [settings.currency, ratesLoaded]); // Re-calculate when currency changes (rates are fetched)
 
   return (
     <AppShell
@@ -110,13 +183,15 @@ function DashboardContent() {
       onLanguageToggle={handleLanguageToggle}
       onCurrencyToggle={handleCurrencyToggle}
       onSettingsClick={() => setIsSettingsOpen(true)}
+      ratesUpdatedAt={ratesUpdatedAt}
+      currentRate={currentRate}
     >
       <div className="space-y-6">
         <div className="flex items-center justify-between">
           <h1 className="text-2xl md:text-3xl font-bold text-slate-900 dark:text-white">
             {settings.language === 'tr' ? 'Panel' : 'Dashboard'}
           </h1>
-           <TransactionForm mode="add" onSubmit={addTransaction} language={settings.language} currency={settings.currency} />
+           <TransactionForm mode="add" onSubmit={handleAddTransaction} language={settings.language} currency={settings.currency} />
         </div>
 
         <MonthSelector
@@ -133,7 +208,7 @@ function DashboardContent() {
           cumulativeWealth={cumulativeWealth}
         />
 
-        <Charts transactions={transactions} currency={settings.currency} language={settings.language} selectedMonth={selectedMonth} selectedYear={selectedYear} />
+        <Charts transactions={transactions} currency={settings.currency} language={settings.language} theme={settings.theme} selectedMonth={selectedMonth} selectedYear={selectedYear} />
 
         <RecentTransactions
           transactions={filteredTransactions}
@@ -170,9 +245,36 @@ function DashboardContent() {
 }
 
 function App() {
+  const [exchangeRates, setExchangeRates] = useState<Record<string, number>>({});
+
+  // Load exchange rates on mount
+  useEffect(() => {
+    const rates = loadPersistedRates();
+    if (rates) {
+      setExchangeRates(rates.rates || {});
+    }
+  }, []);
+
+  // Update local state when rates change
+  useEffect(() => {
+    const handleStorageChange = () => {
+      const rates = loadPersistedRates();
+      if (rates) {
+        setExchangeRates(rates.rates || {});
+      }
+    };
+    
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
+  }, []);
+
+  const handleRatesUpdate = useCallback((rates: Record<string, number>) => {
+    setExchangeRates(rates);
+  }, []);
+
   return (
-    <FinanceProvider>
-      <DashboardContent />
+    <FinanceProvider exchangeRates={exchangeRates}>
+      <DashboardContent onRatesUpdate={handleRatesUpdate} />
     </FinanceProvider>
   );
 }

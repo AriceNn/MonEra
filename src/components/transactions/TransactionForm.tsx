@@ -36,6 +36,7 @@ export function TransactionForm({
     category: string;
     date: string;
     description: string;
+    originalCurrency: 'TRY' | 'USD' | 'EUR' | 'GBP';
   }>({
     type: 'expense',
     title: '',
@@ -43,6 +44,7 @@ export function TransactionForm({
     category: EXPENSE_CATEGORIES[0] || '',
     date: dateToISOString(new Date()),
     description: '',
+    originalCurrency: currency,
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -57,6 +59,7 @@ export function TransactionForm({
         category: transaction.category,
         date: transaction.date,
         description: transaction.description || '',
+        originalCurrency: (transaction as any).originalCurrency || currency,
       });
       setIsModalOpen(true);
     }
@@ -99,7 +102,7 @@ export function TransactionForm({
       category: formData.category,
       date: formData.date,
       description: formData.description || undefined,
-      originalCurrency: currency,
+      originalCurrency: formData.originalCurrency,
     });
 
     if (result === false) {
@@ -118,6 +121,7 @@ export function TransactionForm({
       category: EXPENSE_CATEGORIES[0] || '',
       date: dateToISOString(new Date()),
       description: '',
+      originalCurrency: currency,
     });
     setErrors({});
     setIsModalOpen(false);
@@ -192,6 +196,19 @@ export function TransactionForm({
             value={formData.amount}
             onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
             error={errors.amount}
+          />
+
+          {/* Currency for this transaction */}
+          <Select
+            label={t('currency', language)}
+            value={formData.originalCurrency}
+            onChange={(e) => setFormData({ ...formData, originalCurrency: e.target.value as any })}
+            options={[
+              { value: 'TRY', label: '₺ TRY' },
+              { value: 'USD', label: '$ USD' },
+              { value: 'EUR', label: '€ EUR' },
+              { value: 'GBP', label: '£ GBP' },
+            ]}
           />
 
           {/* Category - Hidden for withdrawal */}

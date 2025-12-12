@@ -63,6 +63,12 @@ export function getExchangeRate(fromCurrency: string, toCurrency: string): numbe
  */
 export function updateExchangeRates(rates: Record<string, number>): void {
   Object.assign(EXCHANGE_RATES, rates);
+  try {
+    const payload = { rates: EXCHANGE_RATES, updatedAt: new Date().toISOString() };
+    window.localStorage.setItem('fintrack_exchange_rates', JSON.stringify(payload));
+  } catch (e) {
+    console.warn('[exchange] Failed to persist rates', e);
+  }
 }
 
 /**
@@ -73,23 +79,51 @@ export function getExchangeRates(): Record<string, number> {
 }
 
 /**
- * Fetch latest exchange rates from exchangerate.host (no API key required)
+ * Fetch latest exchange rates from exchangerate-api.com (free tier, no API key for basic usage)
  * @param base - Base currency for rates (default: USD)
  */
 export async function fetchLatestRates(base: string = 'USD'): Promise<Record<string, number>> {
   try {
-    const res = await fetch(`https://api.exchangerate.host/latest?base=${encodeURIComponent(base)}&symbols=USD,EUR,GBP,TRY`);
+    console.log('[exchange] Fetching latest rates with base:', base);
+    // Using exchangerate-api.com which is more reliable and doesn't require API key for basic usage
+    const res = await fetch(`https://open.er-api.com/v6/latest/${encodeURIComponent(base)}`);
+    console.log('[exchange] API response status:', res.status);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
+    console.log('[exchange] API response:', data);
     if (!data || !data.rates) throw new Error('Invalid response');
-    const rates: Record<string, number> = { ...data.rates };
+    
+    // Extract rates for currencies we support
+    const rates: Record<string, number> = {
+      USD: data.rates.USD || 1,
+      EUR: data.rates.EUR || 0.92,
+      GBP: data.rates.GBP || 0.79,
+      TRY: data.rates.TRY || 32.5,
+    };
     rates[base] = 1.0; // ensure base is normalized
+    console.log('[exchange] Updated rates:', rates);
     // Update local cache
     updateExchangeRates(rates);
     return rates;
   } catch (error) {
-    console.warn('[exchange] Failed to fetch latest rates:', error);
+    console.error('[exchange] Failed to fetch latest rates:', error);
     // Return current cached/static rates
     return getExchangeRates();
+  }
+}
+
+/**
+ * Load exchange rates from localStorage (if present)
+ */
+export function loadPersistedRates(): { rates: Record<string, number>; updatedAt?: string } | null {
+  try {
+    const raw = window.localStorage.getItem('fintrack_exchange_rates');
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed || !parsed.rates) return null;
+    updateExchangeRates(parsed.rates);
+    return parsed;
+  } catch {
+    return null;
   }
 }

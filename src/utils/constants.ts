@@ -7,6 +7,7 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
   language: 'tr',
   theme: 'light',
   inflationRate: 30.0, // Annual inflation rate estimate for Turkey
+  currencyPair: 'TRY-USD',
 };
 
 // LocalStorage keys
