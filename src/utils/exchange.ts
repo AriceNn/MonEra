@@ -84,13 +84,10 @@ export function getExchangeRates(): Record<string, number> {
  */
 export async function fetchLatestRates(base: string = 'USD'): Promise<Record<string, number>> {
   try {
-    console.log('[exchange] Fetching latest rates with base:', base);
     // Using exchangerate-api.com which is more reliable and doesn't require API key for basic usage
     const res = await fetch(`https://open.er-api.com/v6/latest/${encodeURIComponent(base)}`);
-    console.log('[exchange] API response status:', res.status);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
-    console.log('[exchange] API response:', data);
     if (!data || !data.rates) throw new Error('Invalid response');
     
     // Extract rates for currencies we support
@@ -101,7 +98,6 @@ export async function fetchLatestRates(base: string = 'USD'): Promise<Record<str
       TRY: data.rates.TRY || 32.5,
     };
     rates[base] = 1.0; // ensure base is normalized
-    console.log('[exchange] Updated rates:', rates);
     // Update local cache
     updateExchangeRates(rates);
     return rates;

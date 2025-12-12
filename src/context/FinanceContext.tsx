@@ -107,12 +107,10 @@ export function FinanceProvider({ children, exchangeRates = {} }: FinanceProvide
 
     async function initialize() {
       try {
-        console.log('[FinanceContext] Initializing storage...');
-        
         // Auto-migrate if needed
         const migrationResult = await autoMigrate();
         if (migrationResult) {
-          console.log('[FinanceContext] Migration completed:', migrationResult);
+          // Migration successful
         }
 
         // Get current adapter (IndexedDB or localStorage)
@@ -139,8 +137,6 @@ export function FinanceProvider({ children, exchangeRates = {} }: FinanceProvide
 
         // Cleanup old backups (30+ days)
         cleanupBackup();
-
-        console.log('[FinanceContext] Storage initialized successfully');
       } catch (error) {
         console.error('[FinanceContext] Initialization error:', error);
         // Fallback to empty state if initialization fails

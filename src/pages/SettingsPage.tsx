@@ -1,9 +1,11 @@
 import { useRef, useState } from 'react';
-import { Download, Upload } from 'lucide-react';
+import { Download, Upload, Cloud, CloudOff } from 'lucide-react';
 import { Input } from '../components/ui/Input';
 import { Select } from '../components/ui/Select';
 import { Modal } from '../components/ui/Modal';
 import { useFinance } from '../hooks/useFinance';
+import { useAuth } from '../context/AuthContext';
+import { signOut } from '../lib/supabase';
 import { useDataExportImport } from '../hooks/useDataExportImport';
 import type { AppSettings } from '../types';
 
@@ -14,6 +16,7 @@ interface SettingsPageProps {
 
 export function SettingsPage({ isOpen, onClose }: SettingsPageProps) {
   const { settings, updateSettings, transactions, addBulkTransactions } = useFinance();
+  const { user, isAuthenticated, isCloudEnabled } = useAuth();
   const { downloadJSON, downloadCSV, importFromJSON, importFromCSV } = useDataExportImport();
   const [formData, setFormData] = useState<AppSettings>(settings);
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -24,6 +27,26 @@ export function SettingsPage({ isOpen, onClose }: SettingsPageProps) {
   const jsonInputRef = useRef<HTMLInputElement>(null);
   const csvInputRef = useRef<HTMLInputElement>(null);
   const importLockRef = useRef(false);
+
+  const handleLogout = async () => {
+    try {
+      await signOut();
+      setImportMessage({ 
+        type: 'success', 
+        text: settings.language === 'tr' ? 'Başarıyla çıkış yapıldı!' : 'Logged out successfully!' 
+      });
+      setTimeout(() => {
+        setImportMessage(null);
+        onClose();
+      }, 1000);
+    } catch (error) {
+      setImportMessage({ 
+        type: 'error', 
+        text: settings.language === 'tr' ? 'Çıkış yapılırken hata oluştu' : 'Error logging out' 
+      });
+      setTimeout(() => setImportMessage(null), 3000);
+    }
+  };
 
   const handleExportJSON = () => {
     downloadJSON(transactions, settings, `fintrack-${new Date().toISOString().split('T')[0]}.json`);
@@ -40,7 +63,6 @@ export function SettingsPage({ isOpen, onClose }: SettingsPageProps) {
   const handleImportJSON = async (file: File) => {
     // Triple guard: ref lock, state, and early return
     if (importLockRef.current || isProcessing) {
-      console.log('Import already in progress, skipping...');
       return;
     }
     
@@ -113,7 +135,6 @@ export function SettingsPage({ isOpen, onClose }: SettingsPageProps) {
   const handleImportCSV = async (file: File) => {
     // Triple guard: ref lock, state, and early return
     if (importLockRef.current || isProcessing) {
-      console.log('Import already in progress, skipping...');
       return;
     }
     
@@ -349,6 +370,60 @@ export function SettingsPage({ isOpen, onClose }: SettingsPageProps) {
             </div>
           </div>
         </section>
+
+        {/* Cloud Sync Section */}
+        {isCloudEnabled && (
+          <section className="border border-slate-200 dark:border-slate-700 rounded-lg p-4">
+            <h3 className="text-sm font-semibold text-slate-900 dark:text-white mb-4">
+              {settings.language === 'tr' ? 'Bulut Senkronizasyonu' : 'Cloud Sync'}
+            </h3>
+
+            <div className="space-y-4">
+              {isAuthenticated ? (
+                <>
+                  <div className="flex items-center gap-3 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+                    <Cloud size={18} className="text-blue-600 dark:text-blue-400" />
+                    <div className="flex-1">
+                      <p className="text-sm font-medium text-blue-900 dark:text-blue-100">
+                        {settings.language === 'tr' ? 'Bulut Aktif' : 'Cloud Active'}
+                      </p>
+                      <p className="text-xs text-blue-700 dark:text-blue-300">
+                        {user?.email}
+                      </p>
+                    </div>
+                  </div>
+                  
+                  <button
+                    onClick={handleLogout}
+                    className="w-full px-3 py-2.5 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 hover:bg-red-100 dark:hover:bg-red-900/30 text-red-700 dark:text-red-300 transition-colors text-xs font-medium"
+                  >
+                    {settings.language === 'tr' ? 'Çıkış Yap' : 'Sign Out'}
+                  </button>
+                  
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                    {settings.language === 'tr' 
+                      ? '💡 Verileriniz otomatik olarak buluta senkronize edilir' 
+                      : '💡 Your data is automatically synced to cloud'}
+                  </p>
+                </>
+              ) : (
+                <div className="flex items-center gap-3 p-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg">
+                  <CloudOff size={18} className="text-slate-500 dark:text-slate-400" />
+                  <div className="flex-1">
+                    <p className="text-sm font-medium text-slate-900 dark:text-white">
+                      {settings.language === 'tr' ? 'Bulut devre dışı' : 'Cloud disabled'}
+                    </p>
+                    <p className="text-xs text-slate-600 dark:text-slate-400">
+                      {settings.language === 'tr' 
+                        ? 'Verileriniz sadece bu cihazda saklanır' 
+                        : 'Your data is stored locally only'}
+                    </p>
+                  </div>
+                </div>
+              )}
+            </div>
+          </section>
+        )}
 
         {/* Data Management */}
         <section className="border border-slate-200 dark:border-slate-700 rounded-lg p-4">

@@ -2,6 +2,7 @@ import { useState, useMemo, useEffect, useCallback } from 'react';
 import type { Transaction } from './types';
 import { FinanceProvider } from './context/FinanceContext';
 import { useFinance } from './hooks/useFinance';
+import { useAuth } from './context/AuthContext';
 import { AppShell } from './components/layout/AppShell';
 import { SummaryCards } from './components/dashboard/SummaryCards';
 import { RecentTransactions } from './components/dashboard/RecentTransactions';
@@ -16,6 +17,7 @@ import { AnalyticsPage } from './pages/AnalyticsPage';
 import { NotificationSettingsPanel } from './components/notifications/NotificationSettingsPanel';
 import { SkeletonDashboard } from './components/ui/Skeleton';
 import { NoTransactionsEmpty } from './components/ui/EmptyState';
+import { AuthForm } from './components/auth/AuthForm';
 import { generateFinancialSummary } from './utils/calculations';
 import { convertCurrency, fetchLatestRates, updateExchangeRates, loadPersistedRates } from './utils/exchange';
 import './index.css';
@@ -350,6 +352,7 @@ function DashboardContent({ onRatesUpdate }: DashboardContentProps) {
 }
 
 function App() {
+  const { isAuthenticated, isLoading: authLoading, isCloudEnabled } = useAuth();
   const [exchangeRates, setExchangeRates] = useState<Record<string, number>>({});
 
   // Load exchange rates on mount
@@ -377,6 +380,21 @@ function App() {
     setExchangeRates(rates);
   }, []);
 
+  // Show loading skeleton while checking auth
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
+        <SkeletonDashboard />
+      </div>
+    );
+  }
+
+  // Show login form if cloud is enabled but user not authenticated
+  if (isCloudEnabled && !isAuthenticated) {
+    return <AuthForm />;
+  }
+
+  // Show main app
   return (
     <FinanceProvider exchangeRates={exchangeRates}>
       <DashboardContent onRatesUpdate={handleRatesUpdate} />

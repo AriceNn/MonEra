@@ -32,9 +32,19 @@ export default {
           '0%': { backgroundPosition: '-1000px 0' },
           '100%': { backgroundPosition: '1000px 0' },
         },
+        'spin-slow': {
+          '0%': { transform: 'translate(-50%, -50%) rotate(0deg)' },
+          '100%': { transform: 'translate(-50%, -50%) rotate(360deg)' },
+        },
+        'pulse-slow': {
+          '0%, 100%': { opacity: '0.5' },
+          '50%': { opacity: '0.8' },
+        },
       },
       animation: {
         shimmer: 'shimmer 2s infinite linear',
+        'spin-slow': 'spin-slow 20s linear infinite',
+        'pulse-slow': 'pulse-slow 4s ease-in-out infinite',
       },
     },
   },
