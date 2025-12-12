@@ -9,6 +9,7 @@ import { MonthSelector } from './components/dashboard/MonthSelector';
 import { Charts } from './components/dashboard/Charts';
 import { TransactionForm } from './components/transactions/TransactionForm';
 import { SettingsPage } from './pages/SettingsPage';
+import { RecurringTransactionsPage } from './pages/RecurringTransactionsPage';
 import { generateFinancialSummary } from './utils/calculations';
 import { convertCurrency, fetchLatestRates, updateExchangeRates, loadPersistedRates } from './utils/exchange';
 import './index.css';
@@ -18,13 +19,22 @@ interface DashboardContentProps {
 }
 
 function DashboardContent({ onRatesUpdate }: DashboardContentProps) {
-  const { transactions, settings, addTransaction, deleteTransaction, updateTransaction, updateSettings } = useFinance();
+  const { transactions, settings, addTransaction, deleteTransaction, updateTransaction, updateSettings, generateRecurringTransactions } = useFinance();
   const [editingTransaction, setEditingTransaction] = useState<Transaction | undefined>(undefined);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [currentPage, setCurrentPage] = useState<'dashboard' | 'recurring' | 'settings'>('dashboard');
   
   const currentDate = new Date();
   const [selectedMonth, setSelectedMonth] = useState(currentDate.getMonth());
   const [selectedYear, setSelectedYear] = useState(currentDate.getFullYear());
+
+  // Auto-generate recurring transactions on mount
+  useEffect(() => {
+    const count = generateRecurringTransactions();
+    if (count > 0) {
+      console.log(`[Auto-Generated] ${count} recurring transactions created`);
+    }
+  }, [generateRecurringTransactions]);
 
   const handleThemeToggle = () => {
     updateSettings({ theme: settings.theme === 'light' ? 'dark' : 'light' });
@@ -74,7 +84,7 @@ function DashboardContent({ onRatesUpdate }: DashboardContentProps) {
     });
   }, [transactions, selectedMonth, selectedYear]);
 
-  // Calculate cumulative wealth up to selected month
+  // Calculate cumulative wealth up to selected month (Net Worth)
   const cumulativeWealth = useMemo(() => {
     let cumulative = 0;
     transactions.forEach((t) => {
@@ -100,9 +110,16 @@ function DashboardContent({ onRatesUpdate }: DashboardContentProps) {
 
   // Calculate summary for filtered transactions
   const summary = useMemo(() => {
-    const converted = filteredTransactions.map((t) => ({ ...t, amount: getDisplayAmount(t) }));
-    return generateFinancialSummary(converted, selectedMonth, selectedYear);
-  }, [filteredTransactions, selectedMonth, selectedYear, getDisplayAmount]);
+    // For monthly summary: use filtered transactions (only selected month)
+    const convertedFiltered = filteredTransactions.map((t) => ({ ...t, amount: getDisplayAmount(t) }));
+    
+    const monthlySummary = generateFinancialSummary(convertedFiltered, selectedMonth, selectedYear);
+    // Override netWorth with cumulative calculation (already converted)
+    monthlySummary.netWorth = cumulativeWealth;
+    // Cash balance stays monthly (from filtered transactions)
+    
+    return monthlySummary;
+  }, [filteredTransactions, selectedMonth, selectedYear, getDisplayAmount, cumulativeWealth]);
 
   // State to trigger re-render when rates are loaded
   const [ratesLoaded, setRatesLoaded] = useState(false);
@@ -179,6 +196,8 @@ function DashboardContent({ onRatesUpdate }: DashboardContentProps) {
       theme={settings.theme}
       language={settings.language}
       currency={settings.currency}
+      currentPage={currentPage}
+      onNavigate={setCurrentPage}
       onThemeToggle={handleThemeToggle}
       onLanguageToggle={handleLanguageToggle}
       onCurrencyToggle={handleCurrencyToggle}
@@ -186,60 +205,71 @@ function DashboardContent({ onRatesUpdate }: DashboardContentProps) {
       ratesUpdatedAt={ratesUpdatedAt}
       currentRate={currentRate}
     >
-      <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <h1 className="text-2xl md:text-3xl font-bold text-slate-900 dark:text-white">
-            {settings.language === 'tr' ? 'Panel' : 'Dashboard'}
-          </h1>
-           <TransactionForm mode="add" onSubmit={handleAddTransaction} language={settings.language} currency={settings.currency} />
-        </div>
+      {/* Dashboard Page */}
+      {currentPage === 'dashboard' && (
+        <div className="space-y-6">
+          <div className="flex items-center justify-between">
+            <h1 className="text-2xl md:text-3xl font-bold text-slate-900 dark:text-white">
+              {settings.language === 'tr' ? 'Panel' : 'Dashboard'}
+            </h1>
+            <TransactionForm mode="add" onSubmit={handleAddTransaction} language={settings.language} currency={settings.currency} />
+          </div>
 
-        <MonthSelector
-          selectedMonth={selectedMonth}
-          selectedYear={selectedYear}
-          onMonthChange={handleMonthChange}
-          language={settings.language}
-        />
-
-        <SummaryCards
-          summary={summary}
-          currency={settings.currency}
-          language={settings.language}
-          cumulativeWealth={cumulativeWealth}
-        />
-
-        <Charts transactions={transactions} currency={settings.currency} language={settings.language} theme={settings.theme} selectedMonth={selectedMonth} selectedYear={selectedYear} />
-
-        <RecentTransactions
-          transactions={filteredTransactions}
-          currency={settings.currency}
-          language={settings.language}
-          onDelete={deleteTransaction}
-          onEdit={(transaction) => setEditingTransaction(transaction)}
-        />
-
-        {/* Edit Transaction Modal */}
-        {editingTransaction && (
-          <TransactionForm
-            mode="edit"
-            transaction={editingTransaction}
-            onSubmit={(data) => {
-              const ok = updateTransaction(editingTransaction.id, data);
-              if (ok !== false) {
-                setEditingTransaction(undefined);
-              }
-              return ok;
-            }}
-            onClose={() => setEditingTransaction(undefined)}
-            triggerButton={false}
+          <MonthSelector
+            selectedMonth={selectedMonth}
+            selectedYear={selectedYear}
+            onMonthChange={handleMonthChange}
             language={settings.language}
-            currency={settings.currency}
           />
-        )}
 
-        {/* Settings Modal */}
-        <SettingsPage isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} />
-      </div>
+          <SummaryCards
+            summary={summary}
+            currency={settings.currency}
+            language={settings.language}
+            cumulativeWealth={cumulativeWealth}
+          />
+
+          <Charts transactions={transactions} currency={settings.currency} language={settings.language} theme={settings.theme} selectedMonth={selectedMonth} selectedYear={selectedYear} />
+
+          <RecentTransactions
+            transactions={filteredTransactions}
+            currency={settings.currency}
+            language={settings.language}
+            onDelete={deleteTransaction}
+            onEdit={(transaction) => setEditingTransaction(transaction)}
+          />
+
+          {/* Edit Transaction Modal */}
+          {editingTransaction && (
+            <TransactionForm
+              mode="edit"
+              transaction={editingTransaction}
+              onSubmit={(data) => {
+                const ok = updateTransaction(editingTransaction.id, data);
+                if (ok !== false) {
+                  setEditingTransaction(undefined);
+                }
+                return ok;
+              }}
+              onClose={() => setEditingTransaction(undefined)}
+              triggerButton={false}
+              language={settings.language}
+              currency={settings.currency}
+            />
+          )}
+        </div>
+      )}
+
+      {/* Recurring Transactions Page */}
+      {currentPage === 'recurring' && (
+        <RecurringTransactionsPage
+          language={settings.language}
+          currency={settings.currency}
+        />
+      )}
+
+      {/* Settings Modal */}
+      <SettingsPage isOpen={isSettingsOpen || currentPage === 'settings'} onClose={() => { setIsSettingsOpen(false); setCurrentPage('dashboard'); }} />
     </AppShell>
   );
 }

@@ -46,15 +46,33 @@ export function MonthSelector({
 
   const isCurrentMonth = selectedMonth === currentMonth && selectedYear === currentYear;
 
+  // Calculate previous month
+  const prevMonth = selectedMonth === 0 ? 11 : selectedMonth - 1;
+  const prevYear = selectedMonth === 0 ? selectedYear - 1 : selectedYear;
+
+  // Calculate next month
+  const nextMonth = selectedMonth === 11 ? 0 : selectedMonth + 1;
+  const nextYear = selectedMonth === 11 ? selectedYear + 1 : selectedYear;
+
   return (
     <div className="flex items-center justify-between mb-6 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4 shadow-sm">
-      <button
-        onClick={handlePrevMonth}
-        className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors"
-        aria-label="Previous month"
-      >
-        <ChevronLeft size={20} className="text-slate-600 dark:text-slate-400" />
-      </button>
+      <div className="flex items-center gap-4">
+        <button
+          onClick={handlePrevMonth}
+          className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors"
+          aria-label="Previous month"
+        >
+          <ChevronLeft size={20} className="text-slate-600 dark:text-slate-400" />
+        </button>
+        <div className="text-left">
+          <div className="text-xs text-slate-400 dark:text-slate-500">
+            {months[prevMonth]}
+          </div>
+          <div className="text-xs text-slate-300 dark:text-slate-600">
+            {prevYear}
+          </div>
+        </div>
+      </div>
 
       <div className="flex items-center gap-4">
         <h2 className="text-xl font-bold text-slate-900 dark:text-white">
@@ -67,13 +85,23 @@ export function MonthSelector({
         )}
       </div>
 
-      <button
-        onClick={handleNextMonth}
-        className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors"
-        aria-label="Next month"
-      >
-        <ChevronRight size={20} className="text-slate-600 dark:text-slate-400" />
-      </button>
+      <div className="flex items-center gap-4">
+        <div className="text-right">
+          <div className="text-xs text-slate-400 dark:text-slate-500">
+            {months[nextMonth]}
+          </div>
+          <div className="text-xs text-slate-300 dark:text-slate-600">
+            {nextYear}
+          </div>
+        </div>
+        <button
+          onClick={handleNextMonth}
+          className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors"
+          aria-label="Next month"
+        >
+          <ChevronRight size={20} className="text-slate-600 dark:text-slate-400" />
+        </button>
+      </div>
     </div>
   );
 }

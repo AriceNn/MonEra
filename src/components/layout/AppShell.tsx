@@ -1,4 +1,4 @@
-import { Settings, Moon, Sun, Globe, DollarSign } from 'lucide-react';
+import { Settings, Moon, Sun, Globe, DollarSign, LayoutDashboard, Repeat } from 'lucide-react';
 import type { ReactNode } from 'react';
 
 interface AppShellProps {
@@ -6,6 +6,8 @@ interface AppShellProps {
   theme: 'light' | 'dark';
   language: 'tr' | 'en';
   currency: 'TRY' | 'USD' | 'EUR' | 'GBP';
+  currentPage?: 'dashboard' | 'recurring' | 'settings';
+  onNavigate?: (page: 'dashboard' | 'recurring' | 'settings') => void;
   onThemeToggle: () => void;
   onLanguageToggle: () => void;
   onCurrencyToggle?: () => void;
@@ -19,6 +21,8 @@ export function AppShell({
   theme,
   language,
   currency,
+  currentPage = 'dashboard',
+  onNavigate,
   onThemeToggle,
   onLanguageToggle,
   onCurrencyToggle,
@@ -37,6 +41,11 @@ export function AppShell({
     });
   };
 
+  const navItems = [
+    { id: 'dashboard' as const, label: language === 'tr' ? 'Panel' : 'Dashboard', icon: LayoutDashboard },
+    { id: 'recurring' as const, label: language === 'tr' ? 'Tekrarlayan İşlemler' : 'Recurring Transactions', icon: Repeat },
+  ];
+
   return (
     <div className={isDark ? 'dark' : ''}>
       <div className="flex h-screen bg-slate-50 dark:bg-slate-950">
@@ -46,6 +55,28 @@ export function AppShell({
           <header className="h-16 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 px-4 md:px-6 flex items-center justify-between">
             <div className="flex items-center gap-4">
               <h2 className="text-lg md:text-xl font-bold text-slate-900 dark:text-white">FinTrack</h2>
+              
+              {/* Navigation Menu */}
+              <nav className="hidden md:flex items-center gap-1 ml-4">
+                {navItems.map((item) => {
+                  const Icon = item.icon;
+                  const isActive = currentPage === item.id;
+                  return (
+                    <button
+                      key={item.id}
+                      onClick={() => onNavigate?.(item.id)}
+                      className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-colors ${
+                        isActive
+                          ? 'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 font-medium'
+                          : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
+                      }`}
+                    >
+                      <Icon className="w-4 h-4" />
+                      <span className="text-sm">{item.label}</span>
+                    </button>
+                  );
+                })}
+              </nav>
             </div>
 
             {/* Right-side Controls */}
@@ -105,6 +136,28 @@ export function AppShell({
               )}
             </div>
           </header>
+
+          {/* Mobile Navigation */}
+          <nav className="md:hidden flex items-center gap-1 p-2 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 overflow-x-auto">
+            {navItems.map((item) => {
+              const Icon = item.icon;
+              const isActive = currentPage === item.id;
+              return (
+                <button
+                  key={item.id}
+                  onClick={() => onNavigate?.(item.id)}
+                  className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-colors whitespace-nowrap ${
+                    isActive
+                      ? 'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 font-medium'
+                      : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
+                  }`}
+                >
+                  <Icon className="w-4 h-4" />
+                  <span className="text-sm">{item.label}</span>
+                </button>
+              );
+            })}
+          </nav>
 
           {/* Page Content */}
           <main className="flex-1 overflow-auto p-4 md:p-6 bg-slate-50 dark:bg-slate-950">{children}</main>

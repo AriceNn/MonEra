@@ -72,11 +72,12 @@ export function Charts({ transactions, currency, language, theme = 'light', sele
       const amt = from === currency ? t.amount : convertCurrency(t.amount, from, currency);
       
       if (!dataByMonth[monthKey]) {
+        const locale = language === 'tr' ? 'tr-TR' : 'en-US';
         dataByMonth[monthKey] = { 
           income: 0, 
           expense: 0,
           savings: 0,
-          month: new Date(date.getFullYear(), date.getMonth(), 1).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })
+          month: new Date(date.getFullYear(), date.getMonth(), 1).toLocaleDateString(locale, { month: 'short', year: 'numeric' })
         };
       }
       
@@ -96,7 +97,7 @@ export function Charts({ transactions, currency, language, theme = 'light', sele
       .map(([_, data]) => data);
 
     return { monthlyList, monthlyMap: dataByMonth };
-  }, [transactions, currency]);
+  }, [transactions, currency, language]);
   
   // Get only selected month data for cash flow and pie chart
   const selectedMonthData = useMemo(() => {
@@ -107,16 +108,17 @@ export function Charts({ transactions, currency, language, theme = 'light', sele
 
   const recentThreeMonths = useMemo(() => {
     const items = [] as { income: number; expense: number; savings: number; month: string }[];
+    const locale = language === 'tr' ? 'tr-TR' : 'en-US';
     for (let i = 2; i >= 0; i -= 1) {
       const date = new Date(selectedYear, selectedMonth - i, 1);
       const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
-      const label = date.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+      const label = date.toLocaleDateString(locale, { month: 'short', year: 'numeric' });
       items.push(
         monthlyMap[key] || { income: 0, expense: 0, savings: 0, month: label }
       );
     }
     return items;
-  }, [monthlyMap, selectedMonth, selectedYear]);
+  }, [monthlyMap, selectedMonth, selectedYear, language]);
 
   // Calculate cumulative wealth
   const wealthData = useMemo(() => {

@@ -1,7 +1,7 @@
 import { createContext, useCallback } from 'react';
 import type { ReactNode } from 'react';
 import { v4 as uuidv4 } from 'uuid';
-import type { Transaction, AppSettings } from '../types';
+import type { Transaction, AppSettings, RecurringTransaction } from '../types';
 import { DEFAULT_SETTINGS } from '../types';
 import { useLocalStorage } from '../hooks/useLocalStorage';
 import { STORAGE_KEYS, DEFAULT_APP_SETTINGS } from '../utils/constants';
@@ -10,12 +10,20 @@ import { calculateCashBalance } from '../utils/calculations';
 export interface FinanceContextType {
   transactions: Transaction[];
   settings: AppSettings;
+  recurringTransactions: RecurringTransaction[];
   
   // Transaction actions
   addTransaction: (transaction: Omit<Transaction, 'id'>) => boolean;
   addBulkTransactions: (transactions: (Omit<Transaction, 'id'> & { id?: string })[], replaceMode?: boolean) => boolean;
   deleteTransaction: (id: string) => void;
   updateTransaction: (id: string, updates: Partial<Omit<Transaction, 'id'>>) => boolean;
+  
+  // Recurring transaction actions (P2)
+  addRecurringTransaction: (recurring: Omit<RecurringTransaction, 'id'>) => string;
+  updateRecurringTransaction: (id: string, updates: Partial<Omit<RecurringTransaction, 'id'>>) => boolean;
+  deleteRecurringTransaction: (id: string) => void;
+  toggleRecurringActive: (id: string) => void;
+  generateRecurringTransactions: () => number;
   
   // Settings actions
   updateSettings: (settings: Partial<AppSettings>) => void;
@@ -43,6 +51,11 @@ export function FinanceProvider({ children, exchangeRates = {} }: FinanceProvide
   const [settings, setSettings] = useLocalStorage<AppSettings>(
     STORAGE_KEYS.SETTINGS,
     DEFAULT_APP_SETTINGS
+  );
+
+  const [recurringTransactions, setRecurringTransactions] = useLocalStorage<RecurringTransaction[]>(
+    'fintrack_recurring',
+    []
   );
 
   // Track deleted transaction IDs to prevent re-import
@@ -232,15 +245,184 @@ export function FinanceProvider({ children, exchangeRates = {} }: FinanceProvide
   const clearAll = useCallback(() => {
     setTransactions([]);
     setSettings(DEFAULT_APP_SETTINGS);
-  }, [setTransactions, setSettings]);
+    setRecurringTransactions([]);
+  }, [setTransactions, setSettings, setRecurringTransactions]);
+
+  // Recurring Transaction actions (P2)
+  const addRecurringTransaction = useCallback(
+    (recurring: Omit<RecurringTransaction, 'id'>): string => {
+      const newRecurring: RecurringTransaction = {
+        ...recurring,
+        id: uuidv4(),
+        isActive: true,
+      };
+      setRecurringTransactions((prev) => [newRecurring, ...prev]);
+      return newRecurring.id;
+    },
+    [setRecurringTransactions]
+  );
+
+  const updateRecurringTransaction = useCallback(
+    (id: string, updates: Partial<Omit<RecurringTransaction, 'id'>>): boolean => {
+      let updated = false;
+      setRecurringTransactions((prev) => {
+        const index = prev.findIndex((r) => r.id === id);
+        if (index === -1) return prev;
+
+        const updatedRecurring: RecurringTransaction = { ...prev[index], ...updates };
+        const next = [...prev];
+        next[index] = updatedRecurring;
+        updated = true;
+        return next;
+      });
+      return updated;
+    },
+    [setRecurringTransactions]
+  );
+
+  const deleteRecurringTransaction = useCallback(
+    (id: string) => {
+      setRecurringTransactions((prev) => prev.filter((r) => r.id !== id));
+    },
+    [setRecurringTransactions]
+  );
+
+  const toggleRecurringActive = useCallback(
+    (id: string) => {
+      setRecurringTransactions((prev) =>
+        prev.map((r) =>
+          r.id === id ? { ...r, isActive: !r.isActive } : r
+        )
+      );
+    },
+    [setRecurringTransactions]
+  );
+
+  const generateRecurringTransactions = useCallback((): number => {
+    let totalGeneratedCount = 0;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    recurringTransactions.forEach((recurring) => {
+      if (!recurring.isActive) return;
+
+      const startDate = new Date(recurring.startDate);
+      startDate.setHours(0, 0, 0, 0);
+
+      const endDate = recurring.endDate ? new Date(recurring.endDate) : null;
+      if (endDate) {
+        endDate.setHours(0, 0, 0, 0);
+      }
+
+      // Start from the day after lastGenerated, or from startDate if never generated
+      let currentDate = recurring.lastGenerated
+        ? new Date(recurring.lastGenerated)
+        : new Date(startDate);
+      currentDate.setHours(0, 0, 0, 0);
+
+      // If we have lastGenerated, move to the next occurrence
+      if (recurring.lastGenerated) {
+        switch (recurring.frequency) {
+          case 'daily':
+            currentDate.setDate(currentDate.getDate() + 1);
+            break;
+          case 'weekly':
+            currentDate.setDate(currentDate.getDate() + 7);
+            break;
+          case 'monthly':
+            currentDate.setMonth(currentDate.getMonth() + 1);
+            break;
+          case 'yearly':
+            currentDate.setFullYear(currentDate.getFullYear() + 1);
+            break;
+        }
+      }
+
+      // Generate all transactions from currentDate up to endDate (or indefinitely if no endDate)
+      const transactionsToAdd: Transaction[] = [];
+      
+      while (endDate ? currentDate <= endDate : true) {
+        // Create a snapshot of the current date
+        const transactionDate = new Date(currentDate);
+        const dateString = transactionDate.toISOString().split('T')[0];
+
+        // Generate transaction
+        const newTransaction: Transaction = {
+          id: uuidv4(),
+          title: recurring.title,
+          amount: recurring.amount,
+          category: recurring.category,
+          type: recurring.type,
+          date: dateString,
+          originalCurrency: recurring.originalCurrency,
+          isRecurring: true,
+          recurringId: recurring.id,
+          description: recurring.description,
+        };
+
+        transactionsToAdd.push(newTransaction);
+
+        // Move to next occurrence
+        switch (recurring.frequency) {
+          case 'daily':
+            currentDate.setDate(currentDate.getDate() + 1);
+            break;
+          case 'weekly':
+            currentDate.setDate(currentDate.getDate() + 7);
+            break;
+          case 'monthly':
+            currentDate.setMonth(currentDate.getMonth() + 1);
+            break;
+          case 'yearly':
+            currentDate.setFullYear(currentDate.getFullYear() + 1);
+            break;
+        }
+
+        // Safety check: if no endDate, stop after generating reasonable amount
+        if (!endDate && transactionsToAdd.length >= 120) {
+          break; // Max 120 transactions (10 years for monthly)
+        }
+      }
+
+      // Add all transactions at once, checking for duplicates
+      if (transactionsToAdd.length > 0) {
+        setTransactions((prev) => {
+          const newTransactions = transactionsToAdd.filter(
+            (newTx) => !prev.some(
+              (t) => t.recurringId === newTx.recurringId && t.date === newTx.date
+            )
+          );
+          totalGeneratedCount += newTransactions.length;
+          if (newTransactions.length === 0) return prev;
+          return [...newTransactions, ...prev];
+        });
+
+        // Update lastGenerated to the last transaction date generated
+        if (transactionsToAdd.length > 0) {
+          const lastTransaction = transactionsToAdd[transactionsToAdd.length - 1];
+          updateRecurringTransaction(recurring.id, {
+            lastGenerated: lastTransaction.date,
+          });
+        }
+      }
+    });
+
+    return totalGeneratedCount;
+  }, [recurringTransactions, setTransactions, updateRecurringTransaction]);
 
   const value: FinanceContextType = {
     transactions,
     settings,
+    recurringTransactions,
     addTransaction,
     addBulkTransactions,
     deleteTransaction,
     updateTransaction,
+    addRecurringTransaction,
+    updateRecurringTransaction,
+    deleteRecurringTransaction,
+    toggleRecurringActive,
+    generateRecurringTransactions,
     updateSettings,
     resetSettings,
     exportData,

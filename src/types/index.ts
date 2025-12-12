@@ -1,6 +1,9 @@
 // Transaction Types
 export type TransactionType = 'income' | 'expense' | 'savings' | 'withdrawal';
 
+// Recurring Frequency Types (P2)
+export type RecurringFrequency = 'daily' | 'weekly' | 'monthly' | 'yearly';
+
 // Transaction Model
 export interface Transaction {
   id: string;           // UUID v4
@@ -11,7 +14,24 @@ export interface Transaction {
   type: TransactionType;
   description?: string; // Optional description
   isRecurring?: boolean; // Prepared for P2
+  recurringId?: string; // Links to RecurringTransaction if auto-generated
   originalCurrency: 'TRY' | 'USD' | 'EUR' | 'GBP'; // Currency when transaction was created
+}
+
+// Recurring Transaction Model (P2)
+export interface RecurringTransaction {
+  id: string;               // UUID v4
+  title: string;
+  amount: number;
+  category: string;
+  type: TransactionType;
+  frequency: RecurringFrequency;
+  startDate: string;        // ISO String (YYYY-MM-DD) - When to start generating
+  endDate?: string;         // ISO String (YYYY-MM-DD) - Optional end date
+  lastGenerated?: string;   // ISO String (YYYY-MM-DD) - Last date a transaction was generated
+  isActive: boolean;        // Can be paused/resumed
+  description?: string;
+  originalCurrency: 'TRY' | 'USD' | 'EUR' | 'GBP';
 }
 
 // Currency Pair Type

@@ -42,6 +42,23 @@ export const translations = {
     cashBalance: 'Nakit Bakiye',
     withdrawal: 'Tasarruftan Çıkış',
     
+    // P2: Recurring Transactions
+    recurring: 'Tekrarlayan',
+    makeRecurring: 'Tekrarlayan Yap',
+    recurringTransactions: 'Tekrarlayan İşlemler',
+    frequency: 'Sıklık',
+    daily: 'Günlük',
+    weekly: 'Haftalık',
+    monthly: 'Aylık',
+    yearly: 'Yıllık',
+    active: 'Aktif',
+    paused: 'Duraklatıldı',
+    pause: 'Duraklat',
+    resume: 'Devam Et',
+    noEndDate: 'Bitiş Yok',
+    lastGenerated: 'Son Oluşturma',
+    generatedFrom: 'Şundan Oluşturuldu:',
+    
     // Messages
     noTransactions: 'Henüz işlem yok. Yeni işlem ekleyerek başlayın!',
     noDataCharts: 'Grafikleri görmek için işlem ekleyin!',
@@ -165,6 +182,23 @@ export const translations = {
     savings: 'Savings',
     cashBalance: 'Cash Balance',
     withdrawal: 'Withdraw from Savings',
+    
+    // P2: Recurring Transactions
+    recurring: 'Recurring',
+    makeRecurring: 'Make Recurring',
+    recurringTransactions: 'Recurring Transactions',
+    frequency: 'Frequency',
+    daily: 'Daily',
+    weekly: 'Weekly',
+    monthly: 'Monthly',
+    yearly: 'Yearly',
+    active: 'Active',
+    paused: 'Paused',
+    pause: 'Pause',
+    resume: 'Resume',
+    noEndDate: 'No End Date',
+    lastGenerated: 'Last Generated',
+    generatedFrom: 'Generated from:',
     
     // Messages
     noTransactions: 'No transactions yet. Start by adding a new one!',

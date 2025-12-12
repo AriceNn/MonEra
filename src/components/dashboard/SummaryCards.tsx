@@ -13,9 +13,9 @@ interface SummaryCardsProps {
 
 export function SummaryCards({ summary, currency, language, cumulativeWealth = summary?.netWorth ?? 0 }: SummaryCardsProps) {
   return (
-    <div className="grid grid-cols-2 md:grid-cols-6 lg:grid-cols-5 gap-4 mb-6\">
+    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-6">
       {/* Total Income Card */}
-      <Card className="p-4 md:col-span-2 lg:col-span-1">
+      <Card className="p-4">
         <div className="flex items-start justify-between gap-2">
           <div className="flex-1 min-w-0">
             <p className="text-xs font-medium text-slate-500 dark:text-slate-400 truncate">{t('income', language)}</p>
@@ -30,7 +30,7 @@ export function SummaryCards({ summary, currency, language, cumulativeWealth = s
       </Card>
 
       {/* Total Expense Card */}
-      <Card className="p-4 md:col-span-2 lg:col-span-1">
+      <Card className="p-4">
         <div className="flex items-start justify-between gap-2">
           <div className="flex-1 min-w-0">
             <p className="text-xs font-medium text-slate-500 dark:text-slate-400 truncate">{t('expense', language)}</p>
@@ -45,7 +45,7 @@ export function SummaryCards({ summary, currency, language, cumulativeWealth = s
       </Card>
 
       {/* Cash Balance Card */}
-      <Card className="p-4 md:col-span-2 lg:col-span-1">
+      <Card className="p-4">
         <div className="flex items-start justify-between gap-2">
           <div className="flex-1 min-w-0">
             <p className="text-xs font-medium text-slate-500 dark:text-slate-400 truncate">{t('cashBalance', language)}</p>
@@ -65,8 +65,31 @@ export function SummaryCards({ summary, currency, language, cumulativeWealth = s
         </div>
       </Card>
 
-      {/* Savings Rate Card - 50% width on tablet */}
-      <Card className="p-4 md:col-span-3 lg:col-span-1">
+      {/* Monthly Savings Amount Card */}
+      <Card className="p-4">
+        <div className="flex items-start justify-between gap-2">
+          <div className="flex-1 min-w-0">
+            <p className="text-xs font-medium text-slate-500 dark:text-slate-400 truncate">
+              {language === 'tr' ? 'Tasarruf Miktarı' : 'Savings Amount'}
+            </p>
+            <p className={`text-base md:text-lg font-bold mt-1 truncate ${
+              (summary?.totalSavings ?? 0) >= 0 ? 'text-purple-600 dark:text-purple-400' : 'text-rose-600 dark:text-rose-400'
+            }`}>
+              {formatCurrency(summary?.totalSavings ?? 0, currency as any)}
+            </p>
+          </div>
+          <div className={`p-1.5 rounded-md flex-shrink-0 ${
+            (summary?.totalSavings ?? 0) >= 0 
+              ? 'bg-purple-100 dark:bg-purple-900/30' 
+              : 'bg-rose-100 dark:bg-rose-900/30'
+          }`}>
+            <Target className={(summary?.totalSavings ?? 0) >= 0 ? 'text-purple-600 dark:text-purple-400' : 'text-rose-600 dark:text-rose-400'} size={16} />
+          </div>
+        </div>
+      </Card>
+
+      {/* Savings Rate Card */}
+      <Card className="p-4">
         <div className="flex items-start justify-between gap-2">
           <div className="flex-1 min-w-0">
             <p className="text-xs font-medium text-slate-500 dark:text-slate-400 truncate">{t('saveRate', language)}</p>
@@ -77,13 +100,13 @@ export function SummaryCards({ summary, currency, language, cumulativeWealth = s
             </p>
           </div>
           <div className="p-1.5 bg-emerald-100 dark:bg-emerald-900/30 rounded-md flex-shrink-0">
-            <Target className="text-emerald-600 dark:text-emerald-400" size={16} />
+            <TrendingUp className="text-emerald-600 dark:text-emerald-400" size={16} />
           </div>
         </div>
       </Card>
 
-      {/* Net Worth Card - Full width on mobile, 50% on tablet */}
-      <Card className="p-4 col-span-2 md:col-span-3 lg:col-span-1">
+      {/* Net Worth Card */}
+      <Card className="p-4">
         <div className="flex items-start justify-between gap-2">
           <div className="flex-1 min-w-0">
             <p className="text-xs font-medium text-slate-500 dark:text-slate-400 truncate">{t('netWorth', language)}</p>

@@ -4,10 +4,11 @@ import { Button } from '../ui/Button';
 import { Modal } from '../ui/Modal';
 import { Input } from '../ui/Input';
 import { Select } from '../ui/Select';
-import type { Transaction } from '../../types';
+import type { Transaction, RecurringTransaction } from '../../types';
 import { INCOME_CATEGORIES, EXPENSE_CATEGORIES, SAVINGS_CATEGORIES } from '../../types';
 import { dateToISOString } from '../../utils/formatters';
 import { t, translateCategory } from '../../utils/i18n';
+import { useFinance } from '../../hooks/useFinance';
 
 interface TransactionFormProps {
   mode: 'add' | 'edit';
@@ -28,7 +29,9 @@ export function TransactionForm({
   language,
   currency
 }: TransactionFormProps) {
+  const { addRecurringTransaction, generateRecurringTransactions } = useFinance();
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isRecurring, setIsRecurring] = useState(false);
   const [formData, setFormData] = useState<{
     type: 'income' | 'expense' | 'savings' | 'withdrawal';
     title: string;
@@ -37,6 +40,8 @@ export function TransactionForm({
     date: string;
     description: string;
     originalCurrency: 'TRY' | 'USD' | 'EUR' | 'GBP';
+    frequency: 'daily' | 'weekly' | 'monthly' | 'yearly';
+    endDate: string;
   }>({
     type: 'expense',
     title: '',
@@ -45,6 +50,8 @@ export function TransactionForm({
     date: dateToISOString(new Date()),
     description: '',
     originalCurrency: currency,
+    frequency: 'monthly',
+    endDate: '',
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -95,22 +102,61 @@ export function TransactionForm({
   const handleSubmit = () => {
     if (!validateForm()) return;
 
-    const result = onSubmit({
-      type: formData.type,
-      title: formData.title,
-      amount: parseFloat(formData.amount),
-      category: formData.category,
-      date: formData.date,
-      description: formData.description || undefined,
-      originalCurrency: formData.originalCurrency,
-    });
+    // If recurring, create recurring transaction AND the first instance manually
+    if (isRecurring && mode === 'add') {
+      const recurringData: Omit<RecurringTransaction, 'id' | 'isActive'> = {
+        type: formData.type,
+        title: formData.title,
+        amount: parseFloat(formData.amount),
+        category: formData.category,
+        frequency: formData.frequency,
+        startDate: formData.date,
+        endDate: formData.endDate || undefined,
+        description: formData.description || undefined,
+        originalCurrency: formData.originalCurrency,
+        lastGenerated: formData.date,
+      };
+      const recurringId = addRecurringTransaction(recurringData);
+      
+      // Also create the first transaction manually (for immediate display)
+      const result = onSubmit({
+        type: formData.type,
+        title: formData.title,
+        amount: parseFloat(formData.amount),
+        category: formData.category,
+        date: formData.date,
+        description: formData.description || undefined,
+        originalCurrency: formData.originalCurrency,
+        isRecurring: true,
+        recurringId: recurringId,
+      });
+      
+      if (result === false) {
+        const message = language === 'tr'
+          ? 'Nakit bakiye yetersiz. Tutarı düşürmeyi deneyin.'
+          : 'Insufficient cash balance. Try a lower amount.';
+        setErrors((prev) => ({ ...prev, amount: message }));
+        return;
+      }
+    } else {
+      // Normal transaction
+      const result = onSubmit({
+        type: formData.type,
+        title: formData.title,
+        amount: parseFloat(formData.amount),
+        category: formData.category,
+        date: formData.date,
+        description: formData.description || undefined,
+        originalCurrency: formData.originalCurrency,
+      });
 
-    if (result === false) {
-      const message = language === 'tr'
-        ? 'Nakit bakiye yetersiz. Tutarı düşürmeyi deneyin.'
-        : 'Insufficient cash balance. Try a lower amount.';
-      setErrors((prev) => ({ ...prev, amount: message }));
-      return;
+      if (result === false) {
+        const message = language === 'tr'
+          ? 'Nakit bakiye yetersiz. Tutarı düşürmeyi deneyin.'
+          : 'Insufficient cash balance. Try a lower amount.';
+        setErrors((prev) => ({ ...prev, amount: message }));
+        return;
+      }
     }
 
     // Reset form
@@ -122,7 +168,10 @@ export function TransactionForm({
       date: dateToISOString(new Date()),
       description: '',
       originalCurrency: currency,
+      frequency: 'monthly',
+      endDate: '',
     });
+    setIsRecurring(false);
     setErrors({});
     setIsModalOpen(false);
     onClose?.();
@@ -239,6 +288,50 @@ export function TransactionForm({
             value={formData.description}
             onChange={(e) => setFormData({ ...formData, description: e.target.value })}
           />
+
+          {/* Recurring Toggle (Add mode only) */}
+          {mode === 'add' && (
+            <div className="flex items-center gap-2 pt-2">
+              <input
+                id="recurring-toggle"
+                type="checkbox"
+                checked={isRecurring}
+                onChange={(e) => setIsRecurring(e.target.checked)}
+                className="w-4 h-4 text-indigo-600 border-slate-300 rounded focus:ring-indigo-500 dark:border-slate-600 dark:bg-slate-700"
+              />
+              <label
+                htmlFor="recurring-toggle"
+                className="text-sm font-medium text-slate-700 dark:text-slate-300 cursor-pointer"
+              >
+                {t('makeRecurring', language)}
+              </label>
+            </div>
+          )}
+
+          {/* Recurring Options */}
+          {isRecurring && mode === 'add' && (
+            <div className="space-y-3 pt-2 border-t border-slate-200 dark:border-slate-700">
+              <Select
+                label={t('frequency', language)}
+                value={formData.frequency}
+                onChange={(e) => setFormData({ ...formData, frequency: e.target.value as any })}
+                options={[
+                  { value: 'daily', label: t('daily', language) },
+                  { value: 'weekly', label: t('weekly', language) },
+                  { value: 'monthly', label: t('monthly', language) },
+                  { value: 'yearly', label: t('yearly', language) },
+                ]}
+              />
+
+              <Input
+                label={`${t('endDate', language)} (${language === 'tr' ? 'Opsiyonel' : 'Optional'})`}
+                type="date"
+                value={formData.endDate}
+                onChange={(e) => setFormData({ ...formData, endDate: e.target.value })}
+                helperText={language === 'tr' ? 'Boş bırakırsanız süresiz devam eder' : 'Leave empty for no end date'}
+              />
+            </div>
+          )}
         </div>
       </Modal>
     </>

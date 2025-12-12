@@ -63,6 +63,7 @@ export function calculateCumulativeSavings(transactions: Transaction[], upToMont
 
 /**
  * Calculate monthly cash balance (income - expense - savings + withdrawals)
+ * This is for a single month period
  */
 export function calculateCashBalance(transactions: Transaction[]): number {
   // Cash balance = income - expense - savings + withdrawals
@@ -74,6 +75,25 @@ export function calculateCashBalance(transactions: Transaction[]): number {
   const withdrawals = calculateTotalWithdrawals(transactions);
   
   return income - expense - savings + withdrawals;
+}
+
+/**
+ * Calculate cumulative cash balance up to given month/year
+ * This shows total cash on hand from all previous months
+ */
+export function calculateCumulativeCashBalance(transactions: Transaction[], upToMonth: number, upToYear: number): number {
+  const relevantTransactions = transactions.filter((t) => {
+    const date = new Date(t.date);
+    const transYear = date.getFullYear();
+    const transMonth = date.getMonth();
+    
+    // Include if before this month, or same year/month
+    if (transYear < upToYear) return true;
+    if (transYear === upToYear && transMonth <= upToMonth) return true;
+    return false;
+  });
+  
+  return calculateCashBalance(relevantTransactions);
 }
 
 /**
