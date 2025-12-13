@@ -1,9 +1,10 @@
 import { v4 as uuidv4 } from 'uuid';
-import type { Transaction, CategoryBudget, RecurringTransaction, AppSettings } from '../types';
+import type { Transaction, CategoryBudget, RecurringTransaction, AppSettings, RecurringFrequency } from '../types';
 import { LocalStorageAdapter } from './LocalStorageAdapter';
 import { IndexedDBAdapter } from './IndexedDBAdapter';
 import { migrate, rollback, checkMigrationStatus } from './migration';
 import { EXPENSE_CATEGORIES, INCOME_CATEGORIES } from '../types';
+import { calculateNextOccurrence } from '../utils/recurringUtils';
 
 /**
  * Test & Benchmark Utility for Storage Migration
@@ -83,11 +84,13 @@ function generateMockBudgets(): CategoryBudget[] {
  */
 function generateMockRecurring(): RecurringTransaction[] {
   const recurring: RecurringTransaction[] = [];
-  const frequencies: ('monthly' | 'weekly' | 'yearly')[] = ['monthly', 'weekly', 'yearly'];
+  const frequencies: RecurringFrequency[] = ['daily', 'weekly', 'biweekly', 'monthly', 'quarterly', 'yearly'];
 
   for (let i = 0; i < 10; i++) {
     const type = Math.random() > 0.5 ? 'income' : 'expense';
     const categories = type === 'income' ? INCOME_CATEGORIES : EXPENSE_CATEGORIES;
+    const frequency = frequencies[Math.floor(Math.random() * frequencies.length)];
+    const startDate = new Date('2024-01-01').toISOString().split('T')[0];
     
     recurring.push({
       id: uuidv4(),
@@ -95,8 +98,9 @@ function generateMockRecurring(): RecurringTransaction[] {
       amount: Math.floor(Math.random() * 3000) + 100,
       category: categories[Math.floor(Math.random() * categories.length)],
       type,
-      frequency: frequencies[Math.floor(Math.random() * frequencies.length)],
-      startDate: new Date('2024-01-01').toISOString().split('T')[0],
+      frequency,
+      startDate,
+      nextOccurrence: calculateNextOccurrence(startDate, frequency),
       isActive: Math.random() > 0.2,
       originalCurrency: 'TRY'
     });

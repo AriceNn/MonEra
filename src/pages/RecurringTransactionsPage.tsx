@@ -8,6 +8,7 @@ import { Modal } from '../components/ui/Modal';
 import { Input } from '../components/ui/Input';
 import { Select } from '../components/ui/Select';
 import { t, translateCategory } from '../utils/i18n';
+import type { RecurringFrequency } from '../types';
 import { formatCurrency, formatDate } from '../utils/formatters';
 import { INCOME_CATEGORIES, EXPENSE_CATEGORIES, SAVINGS_CATEGORIES } from '../types';
 import type { RecurringTransaction } from '../types';
@@ -43,7 +44,7 @@ export function RecurringTransactionsPage({ language, currency }: RecurringTrans
     }
   };
 
-  const getFrequencyLabel = (frequency: 'daily' | 'weekly' | 'monthly' | 'yearly') => {
+  const getFrequencyLabel = (frequency: RecurringFrequency) => {
     return t(frequency, language);
   };
 

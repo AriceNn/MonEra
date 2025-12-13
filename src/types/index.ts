@@ -2,7 +2,7 @@
 export type TransactionType = 'income' | 'expense' | 'savings' | 'withdrawal';
 
 // Recurring Frequency Types (P2)
-export type RecurringFrequency = 'daily' | 'weekly' | 'monthly' | 'yearly';
+export type RecurringFrequency = 'daily' | 'weekly' | 'biweekly' | 'monthly' | 'quarterly' | 'yearly';
 
 // Transaction Model
 export interface Transaction {
@@ -28,7 +28,8 @@ export interface RecurringTransaction {
   frequency: RecurringFrequency;
   startDate: string;        // ISO String (YYYY-MM-DD) - When to start generating
   endDate?: string;         // ISO String (YYYY-MM-DD) - Optional end date
-  lastGenerated?: string;   // ISO String (YYYY-MM-DD) - Last date a transaction was generated
+  lastGenerated?: string;   // ISO String (YYYY-MM-DD) - Last date a transaction was generated from this template
+  nextOccurrence: string;   // ISO String (YYYY-MM-DD) - Next scheduled occurrence date
   isActive: boolean;        // Can be paused/resumed
   description?: string;
   originalCurrency: 'TRY' | 'USD' | 'EUR' | 'GBP';

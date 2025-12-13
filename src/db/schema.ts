@@ -48,8 +48,8 @@ export class MonEraDB extends Dexie {
       
       // Recurring transactions table
       // Primary key: id
-      // Indexes: frequency, isActive, nextDate, and compound index for active upcoming transactions
-      recurring: 'id, frequency, isActive, nextDate, [isActive+nextDate]',
+      // Indexes: frequency, isActive, nextOccurrence, lastGenerated, and compound indexes for queries
+      recurring: 'id, frequency, isActive, nextOccurrence, lastGenerated, startDate, [isActive+nextOccurrence]',
       
       // Settings table
       // Primary key: id (always 'default')

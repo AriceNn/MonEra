@@ -554,8 +554,23 @@ export function FinanceProvider({ children, exchangeRates = {} }: FinanceProvide
         console.error('[FinanceContext] Error adding recurring:', error);
       });
 
+      // Push to cloud
+      syncService.pushRecurringTransaction(newRecurring).catch(error => {
+        console.error('[FinanceContext] Error syncing recurring to cloud:', error);
+      });
+
       // Update state immediately
-      setRecurringTransactions((prev) => [newRecurring, ...prev]);
+      setRecurringTransactions((prev) => {
+        const updated = [newRecurring, ...prev];
+        
+        // Generate transactions for this new recurring immediately (using updated state)
+        setTimeout(() => {
+          generateRecurringTransactionsForOne(newRecurring);
+        }, 0);
+        
+        return updated;
+      });
+      
       return newRecurring.id;
     },
     [adapter]
@@ -579,6 +594,11 @@ export function FinanceProvider({ children, exchangeRates = {} }: FinanceProvide
           console.error('[FinanceContext] Error updating recurring:', error);
         });
 
+        // Push update to cloud
+        syncService.pushRecurringTransaction(updatedRecurring).catch(error => {
+          console.error('[FinanceContext] Error syncing recurring update to cloud:', error);
+        });
+
         updated = true;
         return next;
       });
@@ -594,6 +614,11 @@ export function FinanceProvider({ children, exchangeRates = {} }: FinanceProvide
       // Update storage asynchronously
       adapter.deleteRecurring(id).catch(error => {
         console.error('[FinanceContext] Error deleting recurring:', error);
+      });
+
+      // Delete from cloud
+      syncService.deleteRecurringTransaction(id).catch(error => {
+        console.error('[FinanceContext] Error deleting recurring from cloud:', error);
       });
 
       // Update state immediately
@@ -625,6 +650,139 @@ export function FinanceProvider({ children, exchangeRates = {} }: FinanceProvide
     },
     [adapter]
   );
+
+  // Helper: Generate transactions for a single recurring (used when adding new recurring)
+  const generateRecurringTransactionsForOne = useCallback((recurring: RecurringTransaction): number => {
+    if (!recurring.isActive) return 0;
+
+    let generatedCount = 0;
+    const startDate = new Date(recurring.startDate);
+    startDate.setHours(0, 0, 0, 0);
+
+    const endDate = recurring.endDate ? new Date(recurring.endDate) : null;
+    if (endDate) {
+      endDate.setHours(0, 0, 0, 0);
+    }
+
+    // Start from nextOccurrence
+    let currentDate = new Date(recurring.nextOccurrence);
+    currentDate.setHours(0, 0, 0, 0);
+
+    // Generate all transactions
+    const transactionsToAdd: Transaction[] = [];
+    
+    while (endDate ? currentDate <= endDate : true) {
+      const transactionDate = new Date(currentDate);
+      const dateString = transactionDate.toISOString().split('T')[0];
+
+      const newTransaction: Transaction = {
+        id: uuidv4(),
+        title: recurring.title,
+        amount: recurring.amount,
+        category: recurring.category,
+        type: recurring.type,
+        date: dateString,
+        originalCurrency: recurring.originalCurrency,
+        isRecurring: true,
+        recurringId: recurring.id,
+        description: recurring.description,
+      };
+
+      transactionsToAdd.push(newTransaction);
+
+      // Move to next occurrence
+      switch (recurring.frequency) {
+        case 'daily':
+          currentDate.setDate(currentDate.getDate() + 1);
+          break;
+        case 'weekly':
+          currentDate.setDate(currentDate.getDate() + 7);
+          break;
+        case 'biweekly':
+          currentDate.setDate(currentDate.getDate() + 14);
+          break;
+        case 'monthly':
+          currentDate.setMonth(currentDate.getMonth() + 1);
+          break;
+        case 'quarterly':
+          currentDate.setMonth(currentDate.getMonth() + 3);
+          break;
+        case 'yearly':
+          currentDate.setFullYear(currentDate.getFullYear() + 1);
+          break;
+      }
+
+      // Safety: max 120 transactions
+      if (!endDate && transactionsToAdd.length >= 120) {
+        break;
+      }
+    }
+
+    // Add all transactions
+    if (transactionsToAdd.length > 0) {
+      setTransactions((prev) => {
+        const newTransactions = transactionsToAdd.filter(
+          (newTx) => !prev.some(
+            (t) => t.recurringId === newTx.recurringId && t.date === newTx.date
+          )
+        );
+        generatedCount = newTransactions.length;
+        if (newTransactions.length === 0) return prev;
+        
+        // Add to storage (IndexedDB)
+        newTransactions.forEach(tx => {
+          adapter?.addTransaction(tx).catch(error => {
+            console.error('[FinanceContext] Error adding generated transaction:', error);
+          });
+        });
+        
+        // Push to cloud (Supabase)
+        newTransactions.forEach(tx => {
+          syncService.pushTransaction(tx).catch(error => {
+            console.error('[FinanceContext] Error syncing generated transaction to cloud:', error);
+          });
+        });
+        
+        return [...newTransactions, ...prev];
+      });
+
+      // Update lastGenerated and nextOccurrence
+      if (transactionsToAdd.length > 0) {
+        const lastTransaction = transactionsToAdd[transactionsToAdd.length - 1];
+        const lastDate = new Date(lastTransaction.date);
+        
+        let nextDate = new Date(lastDate);
+        switch (recurring.frequency) {
+          case 'daily':
+            nextDate.setDate(nextDate.getDate() + 1);
+            break;
+          case 'weekly':
+            nextDate.setDate(nextDate.getDate() + 7);
+            break;
+          case 'biweekly':
+            nextDate.setDate(nextDate.getDate() + 14);
+            break;
+          case 'monthly':
+            nextDate.setMonth(nextDate.getMonth() + 1);
+            break;
+          case 'quarterly':
+            nextDate.setMonth(nextDate.getMonth() + 3);
+            break;
+          case 'yearly':
+            nextDate.setFullYear(nextDate.getFullYear() + 1);
+            break;
+        }
+        
+        updateRecurringTransaction(recurring.id, {
+          lastGenerated: lastTransaction.date,
+          nextOccurrence: nextDate.toISOString().split('T')[0],
+        });
+      }
+    }
+
+    console.log(`[Recurring] Generated ${generatedCount} transactions for "${recurring.title}"`);
+    return generatedCount;
+  }, [adapter, setTransactions, updateRecurringTransaction]);
 
   const generateRecurringTransactions = useCallback((): number => {
     let totalGeneratedCount = 0;
@@ -669,31 +827,11 @@ export function FinanceProvider({ children, exchangeRates = {} }: FinanceProvide
         endDate.setHours(0, 0, 0, 0);
       }
 
-      // Start from the day after lastGenerated, or from startDate if never generated
-      let currentDate = recurring.lastGenerated
-        ? new Date(recurring.lastGenerated)
-        : new Date(startDate);
+      // Start from nextOccurrence (which is either startDate or the next scheduled date)
+      let currentDate = new Date(recurring.nextOccurrence);
       currentDate.setHours(0, 0, 0, 0);
 
-      // If we have lastGenerated, move to the next occurrence
-      if (recurring.lastGenerated) {
-        switch (recurring.frequency) {
-          case 'daily':
-            currentDate.setDate(currentDate.getDate() + 1);
-            break;
-          case 'weekly':
-            currentDate.setDate(currentDate.getDate() + 7);
-            break;
-          case 'monthly':
-            currentDate.setMonth(currentDate.getMonth() + 1);
-            break;
-          case 'yearly':
-            currentDate.setFullYear(currentDate.getFullYear() + 1);
-            break;
-        }
-      }
-
-      // Generate all transactions from currentDate up to endDate (or indefinitely if no endDate)
+      // Generate all transactions from currentDate up to endDate (or reasonable limit)
       const transactionsToAdd: Transaction[] = [];
       
       while (endDate ? currentDate <= endDate : true) {
@@ -725,8 +863,14 @@ export function FinanceProvider({ children, exchangeRates = {} }: FinanceProvide
           case 'weekly':
             currentDate.setDate(currentDate.getDate() + 7);
             break;
+          case 'biweekly':
+            currentDate.setDate(currentDate.getDate() + 14);
+            break;
           case 'monthly':
             currentDate.setMonth(currentDate.getMonth() + 1);
+            break;
+          case 'quarterly':
+            currentDate.setMonth(currentDate.getMonth() + 3);
             break;
           case 'yearly':
             currentDate.setFullYear(currentDate.getFullYear() + 1);
@@ -749,14 +893,55 @@ export function FinanceProvider({ children, exchangeRates = {} }: FinanceProvide
           );
           totalGeneratedCount += newTransactions.length;
           if (newTransactions.length === 0) return prev;
+          
+          // Add to storage (IndexedDB)
+          newTransactions.forEach(tx => {
+            adapter?.addTransaction(tx).catch(error => {
+              console.error('[FinanceContext] Error adding generated transaction:', error);
+            });
+          });
+          
+          // Push to cloud (Supabase)
+          newTransactions.forEach(tx => {
+            syncService.pushTransaction(tx).catch(error => {
+              console.error('[FinanceContext] Error syncing generated transaction to cloud:', error);
+            });
+          });
+          
           return [...newTransactions, ...prev];
         });
 
-        // Update lastGenerated to the last transaction date generated
+        // Update lastGenerated and nextOccurrence
         if (transactionsToAdd.length > 0) {
           const lastTransaction = transactionsToAdd[transactionsToAdd.length - 1];
+          const lastDate = new Date(lastTransaction.date);
+          
+          // Calculate next occurrence after the last generated transaction
+          let nextDate = new Date(lastDate);
+          switch (recurring.frequency) {
+            case 'daily':
+              nextDate.setDate(nextDate.getDate() + 1);
+              break;
+            case 'weekly':
+              nextDate.setDate(nextDate.getDate() + 7);
+              break;
+            case 'biweekly':
+              nextDate.setDate(nextDate.getDate() + 14);
+              break;
+            case 'monthly':
+              nextDate.setMonth(nextDate.getMonth() + 1);
+              break;
+            case 'quarterly':
+              nextDate.setMonth(nextDate.getMonth() + 3);
+              break;
+            case 'yearly':
+              nextDate.setFullYear(nextDate.getFullYear() + 1);
+              break;
+          }
+          
           updateRecurringTransaction(recurring.id, {
             lastGenerated: lastTransaction.date,
+            nextOccurrence: nextDate.toISOString().split('T')[0],
           });
         }
       }

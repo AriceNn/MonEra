@@ -1,6 +1,6 @@
 import { supabase, getCurrentUser } from '../lib/supabase';
 import { db } from '../db/schema';
-import type { Transaction } from '../types';
+import type { Transaction, RecurringTransaction } from '../types';
 
 export interface SyncResult {
   success: boolean;
@@ -103,6 +103,12 @@ export class SyncService {
       totalSynced += txResult.synced;
       totalConflicts += txResult.conflicts;
       errors.push(...txResult.errors);
+
+      // Sync recurring transactions
+      const recurringResult = await this.syncRecurringTransactions(user.id);
+      totalSynced += recurringResult.synced;
+      totalConflicts += recurringResult.conflicts;
+      errors.push(...recurringResult.errors);
 
       // Update last sync time
       this.syncStatus.lastSyncTime = new Date();
@@ -289,6 +295,199 @@ export class SyncService {
       return true;
     } catch (error) {
       console.error('Push transaction error:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Sync recurring transactions between local and cloud
+   */
+  private async syncRecurringTransactions(userId: string): Promise<SyncResult> {
+    console.log('📤 [SyncService] Starting recurring transaction sync...');
+    const errors: string[] = [];
+    let synced = 0;
+    let conflicts = 0;
+
+    try {
+      // 1. Push local recurring transactions to cloud
+      const localRecurring = await db.recurring.toArray();
+      console.log(`📊 [SyncService] Found ${localRecurring.length} local recurring transactions`);
+      
+      for (const recurring of localRecurring) {
+        try {
+          console.log(`📤 [SyncService] Syncing recurring ${recurring.id.substring(0, 8)}...`);
+          
+          const { error: upsertError } = await supabase
+            .from('recurring_transactions')
+            .upsert({
+              id: recurring.id,
+              user_id: userId,
+              title: recurring.title,
+              amount: recurring.amount,
+              category: recurring.category,
+              type: recurring.type,
+              frequency: recurring.frequency,
+              start_date: recurring.startDate,
+              end_date: recurring.endDate || null,
+              last_generated: recurring.lastGenerated || null,
+              next_occurrence: recurring.nextOccurrence,
+              is_active: recurring.isActive,
+              description: recurring.description || null,
+              original_currency: recurring.originalCurrency || 'TRY',
+              updated_at: new Date().toISOString(),
+            }, {
+              onConflict: 'id',
+              ignoreDuplicates: false
+            });
+
+          if (upsertError) {
+            console.error(`❌ [SyncService] Recurring upsert error:`, upsertError);
+            errors.push(`Recurring ${recurring.id}: ${upsertError.message}`);
+          } else {
+            console.log(`✅ [SyncService] Synced recurring ${recurring.id.substring(0, 8)}`);
+            synced++;
+          }
+        } catch (error: any) {
+          console.error(`❌ [SyncService] Recurring exception:`, error);
+          errors.push(`Recurring ${recurring.id}: ${error.message}`);
+        }
+      }
+
+      // 2. Pull cloud recurring transactions to local
+      console.log('📥 [SyncService] Fetching cloud recurring transactions...');
+      const { data: cloudRecurring, error: fetchError } = await supabase
+        .from('recurring_transactions')
+        .select('*')
+        .eq('user_id', userId);
+
+      if (fetchError) {
+        console.error('❌ [SyncService] Recurring fetch error:', fetchError);
+        errors.push(`Recurring fetch: ${fetchError.message}`);
+      } else if (cloudRecurring) {
+        console.log(`📊 [SyncService] Found ${cloudRecurring.length} cloud recurring transactions`);
+        
+        for (const cloudRec of cloudRecurring) {
+          try {
+            const localRec = await db.recurring.get(cloudRec.id);
+
+            if (!localRec) {
+              console.log(`📥 [SyncService] Adding recurring from cloud: ${cloudRec.id.substring(0, 8)}`);
+              
+              const newRecurring: RecurringTransaction = {
+                id: cloudRec.id,
+                title: cloudRec.title,
+                amount: cloudRec.amount,
+                category: cloudRec.category,
+                type: cloudRec.type,
+                frequency: cloudRec.frequency,
+                startDate: cloudRec.start_date,
+                endDate: cloudRec.end_date || undefined,
+                lastGenerated: cloudRec.last_generated || undefined,
+                nextOccurrence: cloudRec.next_occurrence,
+                isActive: cloudRec.is_active,
+                description: cloudRec.description || undefined,
+                originalCurrency: cloudRec.original_currency,
+              };
+              
+              await db.recurring.add(newRecurring);
+              console.log(`✅ [SyncService] Added recurring ${cloudRec.id.substring(0, 8)} from cloud`);
+              synced++;
+            }
+          } catch (error: any) {
+            if (error.name === 'ConstraintError') {
+              console.warn(`⚠️ [SyncService] Duplicate recurring ${cloudRec.id}`);
+            } else {
+              console.error(`❌ [SyncService] Error adding recurring:`, error);
+              errors.push(`Cloud recurring ${cloudRec.id}: ${error.message}`);
+            }
+          }
+        }
+      }
+
+      return { success: errors.length === 0, synced, conflicts, errors };
+    } catch (error: any) {
+      return {
+        success: false,
+        synced,
+        conflicts,
+        errors: [error.message],
+      };
+    }
+  }
+
+  /**
+   * Push a single recurring transaction to cloud
+   */
+  async pushRecurringTransaction(recurring: RecurringTransaction): Promise<boolean> {
+    console.log('📤 [SyncService] Pushing recurring transaction:', recurring.id);
+    const user = await getCurrentUser();
+    if (!user) {
+      console.error('❌ [SyncService] User not authenticated');
+      return false;
+    }
+
+    try {
+      const { error } = await supabase.from('recurring_transactions').upsert({
+        id: recurring.id,
+        user_id: user.id,
+        title: recurring.title,
+        amount: recurring.amount,
+        category: recurring.category,
+        type: recurring.type,
+        frequency: recurring.frequency,
+        start_date: recurring.startDate,
+        end_date: recurring.endDate || null,
+        last_generated: recurring.lastGenerated || null,
+        next_occurrence: recurring.nextOccurrence,
+        is_active: recurring.isActive,
+        description: recurring.description || null,
+        original_currency: recurring.originalCurrency || 'TRY',
+        updated_at: new Date().toISOString(),
+      }, {
+        onConflict: 'id',
+        ignoreDuplicates: false
+      });
+
+      if (error) {
+        console.error('❌ [SyncService] Push recurring error:', error);
+        return false;
+      }
+      
+      console.log('✅ [SyncService] Recurring transaction pushed');
+      return true;
+    } catch (error) {
+      console.error('❌ [SyncService] Push recurring error:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Delete recurring transaction from cloud
+   */
+  async deleteRecurringTransaction(recurringId: string): Promise<boolean> {
+    console.log('🗑️ [SyncService] Deleting recurring transaction:', recurringId);
+    const user = await getCurrentUser();
+    if (!user) {
+      console.error('❌ [SyncService] Cannot delete - user not authenticated');
+      return false;
+    }
+
+    try {
+      const { error } = await supabase
+        .from('recurring_transactions')
+        .delete()
+        .eq('id', recurringId)
+        .eq('user_id', user.id);
+
+      if (error) {
+        console.error('❌ [SyncService] Delete recurring error:', error);
+        return false;
+      }
+      
+      console.log('✅ [SyncService] Recurring transaction deleted from cloud');
+      return true;
+    } catch (error) {
+      console.error('❌ [SyncService] Delete recurring error:', error);
       return false;
     }
   }

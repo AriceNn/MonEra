@@ -158,9 +158,9 @@ export class IndexedDBAdapter implements StorageAdapter {
   async getPendingRecurring(): Promise<RecurringTransaction[]> {
     const today = new Date().toISOString().split('T')[0];
     
-    // Uses compound index [isActive+nextDate] for efficient filtering
+    // Uses compound index [isActive+nextOccurrence] for efficient filtering
     return await db.recurring
-      .where('[isActive+nextDate]')
+      .where('[isActive+nextOccurrence]')
       .between([1, ''], [1, today], false, true)
       .toArray();
   }
