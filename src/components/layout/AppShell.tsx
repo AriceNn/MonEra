@@ -59,7 +59,7 @@ export function AppShell({
           {/* Header */}
           <header className="h-16 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 px-4 md:px-6 flex items-center justify-between">
             <div className="flex items-center gap-4">
-              <h2 className="text-lg md:text-xl font-bold text-slate-900 dark:text-white">FinTrack</h2>
+              <h2 className="text-lg md:text-xl font-bold text-slate-900 dark:text-white">MonEra</h2>
               
               {/* Navigation Menu */}
               <nav className="hidden md:flex items-center gap-1 ml-4">

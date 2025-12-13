@@ -133,7 +133,7 @@ export async function generateMockData(transactionCount: number = 1000): Promise
   });
 
   // Clear migration flag to simulate fresh state
-  localStorage.removeItem('fintrack_migration_status');
+  localStorage.removeItem('monera_migration_status');
 
   console.log(`[Test] Generated ${transactions.length} transactions, ${budgets.length} budgets, ${recurring.length} recurring`);
   console.log('[Test] Mock data saved to localStorage');

@@ -17,7 +17,7 @@ export function AuthForm({ language: providedLanguage }: AuthFormProps) {
   const getLanguage = (): 'tr' | 'en' => {
     if (providedLanguage) return providedLanguage;
     try {
-      const stored = localStorage.getItem('fintrack-settings');
+      const stored = localStorage.getItem('monera-settings');
       if (stored) {
         const settings = JSON.parse(stored);
         return settings.language || 'tr';
@@ -172,7 +172,7 @@ export function AuthForm({ language: providedLanguage }: AuthFormProps) {
             <span className="text-3xl font-bold text-white">₺</span>
           </div>
           <h1 className="text-2xl md:text-3xl font-bold bg-gradient-to-r from-indigo-400 via-indigo-300 to-purple-400 bg-clip-text text-transparent mb-2">
-            FinTrack
+            MonEra
           </h1>
           <p className="text-sm md:text-base text-slate-400">
             {mode === 'reset' ? t.reset : mode === 'signup' ? t.signup : t.signin}

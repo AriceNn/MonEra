@@ -50,13 +50,13 @@ export function SettingsPage({ isOpen, onClose }: SettingsPageProps) {
   };
 
   const handleExportJSON = () => {
-    downloadJSON(transactions, settings, `fintrack-${new Date().toISOString().split('T')[0]}.json`);
+    downloadJSON(transactions, settings, `monera-${new Date().toISOString().split('T')[0]}.json`);
     setImportMessage({ type: 'success', text: settings.language === 'tr' ? 'Veriler başarıyla dışa aktarıldı!' : 'Data exported successfully!' });
     setTimeout(() => setImportMessage(null), 3000);
   };
 
   const handleExportCSV = () => {
-    downloadCSV(transactions, `fintrack-${new Date().toISOString().split('T')[0]}.csv`);
+    downloadCSV(transactions, `monera-${new Date().toISOString().split('T')[0]}.csv`);
     setImportMessage({ type: 'success', text: settings.language === 'tr' ? 'Veriler başarıyla dışa aktarıldı!' : 'Data exported successfully!' });
     setTimeout(() => setImportMessage(null), 3000);
   };

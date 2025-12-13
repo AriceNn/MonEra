@@ -93,14 +93,14 @@ export function FinanceProvider({ children, exchangeRates = {} }: FinanceProvide
   // Cloud sync state (P3 Sprint 2)
   const [syncStatus, setSyncStatus] = useState<SyncStatus>(syncService.getSyncStatus());
   const [autoSync, setAutoSync] = useState<boolean>(() => {
-    const stored = localStorage.getItem('fintrack-auto-sync');
+    const stored = localStorage.getItem('monera-auto-sync');
     return stored ? JSON.parse(stored) : true;
   });
 
   // Load notification settings from localStorage
   useEffect(() => {
     try {
-      const stored = localStorage.getItem('fintrack_notification_settings');
+      const stored = localStorage.getItem('monera_notification_settings');
       if (stored) {
         const loadedSettings = JSON.parse(stored);
         setNotificationSettings(loadedSettings);
@@ -906,7 +906,7 @@ export function FinanceProvider({ children, exchangeRates = {} }: FinanceProvide
       
       // Persist to localStorage
       try {
-        localStorage.setItem('fintrack_notification_settings', JSON.stringify(updated));
+        localStorage.setItem('monera_notification_settings', JSON.stringify(updated));
       } catch (error) {
         console.error('[FinanceContext] Error saving notification settings:', error);
       }
@@ -973,7 +973,7 @@ export function FinanceProvider({ children, exchangeRates = {} }: FinanceProvide
 
   const handleAutoSyncChange = useCallback((enabled: boolean) => {
     setAutoSync(enabled);
-    localStorage.setItem('fintrack-auto-sync', JSON.stringify(enabled));
+    localStorage.setItem('monera-auto-sync', JSON.stringify(enabled));
   }, []);
 
   // Subscribe to sync status changes
@@ -1100,7 +1100,7 @@ export function FinanceProvider({ children, exchangeRates = {} }: FinanceProvide
           flexDirection: 'column',
           gap: '1rem'
         }}>
-          <div style={{ fontSize: '1.5rem', fontWeight: 'bold' }}>FinTrack</div>
+          <div style={{ fontSize: '1.5rem', fontWeight: 'bold' }}>MonEra</div>
           <div>Loading...</div>
         </div>
       </FinanceContext.Provider>

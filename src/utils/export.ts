@@ -44,7 +44,7 @@ export function exportTransactionsCSV(options: ExportOptions): void {
   }));
 
   const csv = Papa.unparse(csvData);
-  downloadFile(csv, `fintrack-transactions-${new Date().toISOString().split('T')[0]}.csv`, 'text/csv');
+  downloadFile(csv, `monera-transactions-${new Date().toISOString().split('T')[0]}.csv`, 'text/csv');
 }
 
 export function exportMonthlyBreakdownCSV(monthlyData: MonthlyData[], language: 'tr' | 'en', currency: string): void {
@@ -58,7 +58,7 @@ export function exportMonthlyBreakdownCSV(monthlyData: MonthlyData[], language: 
   }));
 
   const csv = Papa.unparse(csvData);
-  downloadFile(csv, `fintrack-monthly-${new Date().toISOString().split('T')[0]}.csv`, 'text/csv');
+  downloadFile(csv, `monera-monthly-${new Date().toISOString().split('T')[0]}.csv`, 'text/csv');
 }
 
 export function exportCategoryBreakdownCSV(categoryData: CategoryData[], language: 'tr' | 'en', currency: string): void {
@@ -71,7 +71,7 @@ export function exportCategoryBreakdownCSV(categoryData: CategoryData[], languag
   }));
 
   const csv = Papa.unparse(csvData);
-  downloadFile(csv, `fintrack-categories-${new Date().toISOString().split('T')[0]}.csv`, 'text/csv');
+  downloadFile(csv, `monera-categories-${new Date().toISOString().split('T')[0]}.csv`, 'text/csv');
 }
 
 export function exportAnalyticsSummaryCSV(options: ExportOptions, insights: any): void {
@@ -119,7 +119,7 @@ export function exportAnalyticsSummaryCSV(options: ExportOptions, insights: any)
   }
 
   const csv = Papa.unparse(summaryData);
-  downloadFile(csv, `fintrack-summary-${new Date().toISOString().split('T')[0]}.csv`, 'text/csv');
+  downloadFile(csv, `monera-summary-${new Date().toISOString().split('T')[0]}.csv`, 'text/csv');
 }
 
 function downloadFile(content: string, filename: string, mimeType: string): void {

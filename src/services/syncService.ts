@@ -35,7 +35,7 @@ export class SyncService {
 
   private constructor() {
     // Load last sync time from localStorage
-    const lastSync = localStorage.getItem('fintrack-last-sync');
+    const lastSync = localStorage.getItem('monera-last-sync');
     if (lastSync) {
       this.syncStatus.lastSyncTime = new Date(lastSync);
     }
@@ -106,7 +106,7 @@ export class SyncService {
 
       // Update last sync time
       this.syncStatus.lastSyncTime = new Date();
-      localStorage.setItem('fintrack-last-sync', this.syncStatus.lastSyncTime.toISOString());
+      localStorage.setItem('monera-last-sync', this.syncStatus.lastSyncTime.toISOString());
 
       const result = {
         success: errors.length === 0,

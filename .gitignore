@@ -11,7 +11,6 @@ node_modules
 dist
 dist-ssr
 *.local
-*.md
 
 # Environment variables
 .env
@@ -28,8 +27,6 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+/outOfGit
 
-memoryBank.txt
-future.txt
-
-*.sql
+plan-monera.prompt.md

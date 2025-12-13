@@ -13,7 +13,7 @@ export function ExportImportPanel() {
 
   const handleExportJSON = () => {
     try {
-      downloadJSON(transactions, settings, `fintrack-${new Date().toISOString().split('T')[0]}.json`);
+      downloadJSON(transactions, settings, `monera-${new Date().toISOString().split('T')[0]}.json`);
       setStatus({
         type: 'success',
         message: t('exportSuccess', settings.language),

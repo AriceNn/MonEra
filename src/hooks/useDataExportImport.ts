@@ -23,7 +23,7 @@ export function useDataExportImport() {
   /**
    * Download JSON file to user's computer
    */
-  const downloadJSON = useCallback((transactions: Transaction[], settings: AppSettings, filename = 'fintrack-data.json'): void => {
+  const downloadJSON = useCallback((transactions: Transaction[], settings: AppSettings, filename = 'monera-data.json'): void => {
     const jsonData = exportToJSON(transactions, settings);
     const blob = new Blob([jsonData], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
@@ -184,7 +184,7 @@ export function useDataExportImport() {
   /**
    * Download CSV file to user's computer
    */
-  const downloadCSV = useCallback((transactions: Transaction[], filename = 'fintrack-data.csv'): void => {
+  const downloadCSV = useCallback((transactions: Transaction[], filename = 'monera-data.csv'): void => {
     const csvData = transactionsToCSV(transactions);
     const blob = new Blob([csvData], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);

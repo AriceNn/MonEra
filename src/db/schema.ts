@@ -13,7 +13,7 @@ import type { Transaction, CategoryBudget, RecurringTransaction, AppSettings } f
  * - recurring: Recurring transaction templates
  * - settings: Application settings
  */
-export class FinTrackDB extends Dexie {
+export class MonEraDB extends Dexie {
   // Table declarations
   transactions!: Table<Transaction, string>;
   budgets!: Table<CategoryBudget, string>;
@@ -21,7 +21,7 @@ export class FinTrackDB extends Dexie {
   settings!: Table<AppSettings & { id: string }, string>;
 
   constructor() {
-    super('FinTrackDB');
+    super('MonEraDB');
     
     /**
      * Version 1: Initial schema
@@ -62,7 +62,7 @@ export class FinTrackDB extends Dexie {
  * Global database instance
  * Use this instance throughout the app
  */
-export const db = new FinTrackDB();
+export const db = new MonEraDB();
 
 /**
  * Database utility functions

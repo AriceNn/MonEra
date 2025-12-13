@@ -33,9 +33,9 @@ export interface MigrationResult {
   };
 }
 
-const MIGRATION_FLAG_KEY = 'fintrack_migration_status';
-const MIGRATION_BACKUP_KEY = 'fintrack_migration_backup';
-const MIGRATION_DATE_KEY = 'fintrack_migration_date';
+const MIGRATION_FLAG_KEY = 'monera_migration_status';
+const MIGRATION_BACKUP_KEY = 'monera_migration_backup';
+const MIGRATION_DATE_KEY = 'monera_migration_date';
 
 /**
  * Check current migration status

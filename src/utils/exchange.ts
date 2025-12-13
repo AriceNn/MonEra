@@ -65,7 +65,7 @@ export function updateExchangeRates(rates: Record<string, number>): void {
   Object.assign(EXCHANGE_RATES, rates);
   try {
     const payload = { rates: EXCHANGE_RATES, updatedAt: new Date().toISOString() };
-    window.localStorage.setItem('fintrack_exchange_rates', JSON.stringify(payload));
+    window.localStorage.setItem('monera_exchange_rates', JSON.stringify(payload));
   } catch (e) {
     console.warn('[exchange] Failed to persist rates', e);
   }
@@ -113,7 +113,7 @@ export async function fetchLatestRates(base: string = 'USD'): Promise<Record<str
  */
 export function loadPersistedRates(): { rates: Record<string, number>; updatedAt?: string } | null {
   try {
-    const raw = window.localStorage.getItem('fintrack_exchange_rates');
+    const raw = window.localStorage.getItem('monera_exchange_rates');
     if (!raw) return null;
     const parsed = JSON.parse(raw);
     if (!parsed || !parsed.rates) return null;

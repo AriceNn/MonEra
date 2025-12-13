@@ -25,20 +25,20 @@ import './index.css';
 // Load test utilities in development
 if (import.meta.env.DEV) {
   import('./db/testMigration').then(module => {
-    (window as any).FinTrackTest = {
+    (window as any).MonEraTest = {
       generateMockData: module.generateMockData,
       testMigration: module.testMigration,
       benchmarkPerformance: module.benchmarkPerformance,
       testRollback: module.testRollback,
       runAllTests: module.runAllTests
     };
-    console.log('🧪 FinTrack Test Suite Loaded');
+    console.log('🧪 MonEra Test Suite Loaded');
     console.log('Available commands:');
-    console.log('  FinTrackTest.generateMockData(1000) - Generate 1000 mock transactions');
-    console.log('  FinTrackTest.testMigration() - Test localStorage → IndexedDB migration');
-    console.log('  FinTrackTest.benchmarkPerformance() - Compare query performance');
-    console.log('  FinTrackTest.testRollback() - Test IndexedDB → localStorage rollback');
-    console.log('  FinTrackTest.runAllTests() - Run complete test suite');
+    console.log('  MonEraTest.generateMockData(1000) - Generate 1000 mock transactions');
+    console.log('  MonEraTest.testMigration() - Test localStorage → IndexedDB migration');
+    console.log('  MonEraTest.benchmarkPerformance() - Compare query performance');
+    console.log('  MonEraTest.testRollback() - Test IndexedDB → localStorage rollback');
+    console.log('  MonEraTest.runAllTests() - Run complete test suite');
   });
 }
 

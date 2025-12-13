@@ -83,7 +83,7 @@ export class NotificationManager {
    */
   private loadNotifications(): void {
     try {
-      const stored = localStorage.getItem('fintrack_notifications');
+      const stored = localStorage.getItem('monera_notifications');
       if (stored) {
         this.notifications = JSON.parse(stored);
       }
@@ -97,7 +97,7 @@ export class NotificationManager {
    */
   private saveNotifications(): void {
     try {
-      localStorage.setItem('fintrack_notifications', JSON.stringify(this.notifications));
+      localStorage.setItem('monera_notifications', JSON.stringify(this.notifications));
     } catch (error) {
       console.error('[Notifications] Error saving:', error);
     }

@@ -18,10 +18,10 @@ import { DEFAULT_SETTINGS } from '../types';
  */
 export class LocalStorageAdapter implements StorageAdapter {
   private readonly KEYS = {
-    TRANSACTIONS: 'fintrack_transactions',
-    BUDGETS: 'fintrack_budgets',
-    RECURRING: 'fintrack_recurring',
-    SETTINGS: 'fintrack_settings'
+    TRANSACTIONS: 'monera_transactions',
+    BUDGETS: 'monera_budgets',
+    RECURRING: 'monera_recurring',
+    SETTINGS: 'monera_settings'
   };
 
   // ============================================

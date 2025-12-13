@@ -30,11 +30,10 @@ export function TransactionForm({
   language,
   currency
 }: TransactionFormProps) {
-  const { addRecurringTransaction, generateRecurringTransactions, getBudgetProgress, budgets } = useFinance();
+  const { addRecurringTransaction, getBudgetProgress, budgets } = useFinance();
   const { showConfirm, AlertComponent } = useAlert();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isRecurring, setIsRecurring] = useState(false);
-  const [budgetWarning, setBudgetWarning] = useState<string | null>(null);
   const [formData, setFormData] = useState<{
     type: 'income' | 'expense' | 'savings' | 'withdrawal';
     title: string;
@@ -70,6 +69,8 @@ export function TransactionForm({
         date: transaction.date,
         description: transaction.description || '',
         originalCurrency: (transaction as any).originalCurrency || currency,
+        frequency: 'monthly',
+        endDate: '',
       });
       setIsModalOpen(true);
     }
@@ -86,16 +87,27 @@ export function TransactionForm({
 
     if (!formData.title.trim()) {
       newErrors.title = language === 'tr' ? 'Başlık gereklidir' : 'Title is required';
+    } else if (formData.title.length > 100) {
+      newErrors.title = language === 'tr' ? 'Başlık en fazla 100 karakter olabilir' : 'Title must be 100 characters or less';
     }
+    
     if (!formData.amount || parseFloat(formData.amount) <= 0) {
       newErrors.amount = language === 'tr' ? 'Tutar 0\'dan büyük olmalıdır' : 'Amount must be greater than 0';
+    } else if (parseFloat(formData.amount) > 999999999) {
+      newErrors.amount = language === 'tr' ? 'Tutar çok büyük' : 'Amount is too large';
     }
+    
     // Category is required only if not withdrawal
     if (formData.type !== 'withdrawal' && !formData.category) {
       newErrors.category = language === 'tr' ? 'Kategori gereklidir' : 'Category is required';
     }
+    
     if (!formData.date) {
       newErrors.date = language === 'tr' ? 'Tarih gereklidir' : 'Date is required';
+    }
+    
+    if (formData.description && formData.description.length > 500) {
+      newErrors.description = language === 'tr' ? 'Açıklama en fazla 500 karakter olabilir' : 'Description must be 500 characters or less';
     }
 
     setErrors(newErrors);
@@ -140,7 +152,7 @@ export function TransactionForm({
 
     // If recurring, create recurring transaction AND the first instance manually
     if (isRecurring && mode === 'add') {
-      const recurringData: Omit<RecurringTransaction, 'id' | 'isActive'> = {
+      const recurringData: Omit<RecurringTransaction, 'id'> = {
         type: formData.type,
         title: formData.title,
         amount: parseFloat(formData.amount),
@@ -151,6 +163,7 @@ export function TransactionForm({
         description: formData.description || undefined,
         originalCurrency: formData.originalCurrency,
         lastGenerated: formData.date,
+        isActive: true,
       };
       const recurringId = addRecurringTransaction(recurringData);
       
@@ -282,6 +295,7 @@ export function TransactionForm({
             value={formData.title}
             onChange={(e) => setFormData({ ...formData, title: e.target.value })}
             error={errors.title}
+            maxLength={100}
           />
 
           {/* Amount */}
@@ -290,6 +304,7 @@ export function TransactionForm({
             type="number"
             placeholder="0.00"
             min="0"
+            max="999999999"
             step="0.01"
             value={formData.amount}
             onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
@@ -336,6 +351,8 @@ export function TransactionForm({
             placeholder={language === 'tr' ? 'Not ekle...' : 'Add a note...'}
             value={formData.description}
             onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+            error={errors.description}
+            maxLength={500}
           />
 
           {/* Recurring Toggle (Add mode only) */}

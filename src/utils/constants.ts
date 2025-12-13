@@ -20,10 +20,10 @@ export const DEFAULT_APP_SETTINGS: AppSettings = {
 
 // LocalStorage keys
 export const STORAGE_KEYS = {
-  TRANSACTIONS: 'fintrack_transactions',
-  SETTINGS: 'fintrack_settings',
-  RECURRING: 'fintrack_recurring',
-  BUDGETS: 'fintrack_budgets',
+  TRANSACTIONS: 'monera_transactions',
+  SETTINGS: 'monera_settings',
+  RECURRING: 'monera_recurring',
+  BUDGETS: 'monera_budgets',
 } as const;
 
 // Colors for transactions
