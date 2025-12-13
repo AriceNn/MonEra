@@ -95,18 +95,49 @@ function DashboardContent({ onRatesUpdate }: DashboardContentProps) {
     });
   }, []); // Empty dependency array - only run on mount
 
-  const handleThemeToggle = () => {
-    updateSettings({ theme: settings.theme === 'light' ? 'dark' : 'light' });
+  const handleThemeToggle = async () => {
+    console.log('[handleThemeToggle] Starting...');
+    const newTheme = settings.theme === 'light' ? 'dark' : 'light';
+    console.log(`[handleThemeToggle] Attempting to change to: ${newTheme}`);
+    const success = await updateSettings({ theme: newTheme });
+    console.log(`[handleThemeToggle] updateSettings returned: ${success}`);
+    if (success) {
+      console.log(`[handleThemeToggle] Theme changed to: ${newTheme}`);
+      // Ensure DOM is updated
+      if (newTheme === 'dark') {
+        document.documentElement.classList.add('dark');
+      } else {
+        document.documentElement.classList.remove('dark');
+      }
+    } else {
+      console.error('[handleThemeToggle] Failed to update settings');
+    }
   };
 
-  const handleLanguageToggle = () => {
-    updateSettings({ language: settings.language === 'tr' ? 'en' : 'tr' });
+  const handleLanguageToggle = async () => {
+    console.log('[handleLanguageToggle] Starting...');
+    const newLang = settings.language === 'tr' ? 'en' : 'tr';
+    console.log(`[handleLanguageToggle] Attempting to change to: ${newLang}`);
+    const success = await updateSettings({ language: newLang });
+    console.log(`[handleLanguageToggle] updateSettings returned: ${success}`);
+    if (success) {
+      console.log(`[handleLanguageToggle] Language changed to: ${newLang}`);
+    } else {
+      console.error('[handleLanguageToggle] Failed to update settings');
+    }
   };
 
-  const handleCurrencyToggle = () => {
+  const handleCurrencyToggle = async () => {
+    console.log('[handleCurrencyToggle] Starting...');
     const newCurrency = settings.currency === 'TRY' ? 'USD' : 'TRY';
-    // Just update the display currency - no transaction conversion needed
-    updateSettings({ currency: newCurrency });
+    console.log(`[handleCurrencyToggle] Attempting to change to: ${newCurrency}`);
+    const success = await updateSettings({ currency: newCurrency });
+    console.log(`[handleCurrencyToggle] updateSettings returned: ${success}`);
+    if (success) {
+      console.log(`[handleCurrencyToggle] Currency changed to: ${newCurrency}`);
+    } else {
+      console.error('[handleCurrencyToggle] Failed to update settings');
+    }
   };
 
   const handleMonthChange = (month: number, year: number) => {

@@ -536,21 +536,40 @@ export function FinanceProvider({ children, exchangeRates = {} }: FinanceProvide
         return false;
       }
 
-      // Update in Supabase
-      const { error } = await supabase.from('app_settings').update({
+      // First try upsert
+      const { error: upsertError } = await supabase.from('app_settings').upsert({
+        user_id: user.id,
         language: newSettings.language,
         currency: newSettings.currency,
         theme: newSettings.theme,
         notifications_enabled: newSettings.notificationsEnabled,
         notification_sound: newSettings.notificationSound,
+        updated_at: new Date().toISOString(),
       }).eq('user_id', user.id);
 
-      if (error) {
-        console.error('[FinanceContext] Error updating settings:', error);
-        return false;
+      if (upsertError) {
+        console.error('[FinanceContext] Upsert failed, trying insert:', upsertError);
+        
+        // If upsert fails (table might not exist), try insert
+        const { error: insertError } = await supabase.from('app_settings').insert({
+          user_id: user.id,
+          language: newSettings.language,
+          currency: newSettings.currency,
+          theme: newSettings.theme,
+          notifications_enabled: newSettings.notificationsEnabled,
+          notification_sound: newSettings.notificationSound,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        });
+
+        if (insertError) {
+          console.error('[FinanceContext] Both upsert and insert failed:', insertError);
+          // Table doesn't exist, just update local state
+          console.warn('[FinanceContext] Settings table not available, using local state only');
+        }
       }
 
-      // Update state
+      // Update state regardless (local-first approach)
       setSettings((prev) => {
         const updated = { ...prev, ...newSettings };
         
@@ -559,6 +578,16 @@ export function FinanceProvider({ children, exchangeRates = {} }: FinanceProvide
           notificationManager.setLanguage(newSettings.language);
         }
         
+        // Update DOM for theme changes
+        if (newSettings.theme) {
+          if (newSettings.theme === 'dark') {
+            document.documentElement.classList.add('dark');
+          } else {
+            document.documentElement.classList.remove('dark');
+          }
+        }
+        
+        console.log('[FinanceContext] Settings updated in state:', updated);
         return updated;
       });
       

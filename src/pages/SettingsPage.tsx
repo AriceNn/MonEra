@@ -259,10 +259,20 @@ export function SettingsPage({ isOpen, onClose }: SettingsPageProps) {
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (validateForm()) {
-      updateSettings(formData);
-      onClose();
+      const success = await updateSettings(formData);
+      if (success) {
+        console.log('[SettingsPage] Settings saved successfully');
+        onClose();
+      } else {
+        console.error('[SettingsPage] Failed to save settings');
+        setImportMessage({ 
+          type: 'error', 
+          text: settings.language === 'tr' ? 'Ayarlar kaydedilemedi' : 'Failed to save settings' 
+        });
+        setTimeout(() => setImportMessage(null), 3000);
+      }
     }
   };
 

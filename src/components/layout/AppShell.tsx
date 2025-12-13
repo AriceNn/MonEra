@@ -101,7 +101,10 @@ export function AppShell({
 
               {/* Currency Toggle */}
               <button
-                onClick={onCurrencyToggle}
+                onClick={() => {
+                  console.log('[AppShell] Currency toggle clicked');
+                  onCurrencyToggle?.();
+                }}
                 className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700/50 transition-colors text-slate-700 dark:text-slate-300"
                 title={`Switch to ${currency === 'TRY' ? 'USD' : 'TRY'}`}
               >
@@ -111,7 +114,10 @@ export function AppShell({
 
               {/* Language Toggle */}
               <button
-                onClick={onLanguageToggle}
+                onClick={() => {
+                  console.log('[AppShell] Language toggle clicked');
+                  onLanguageToggle?.();
+                }}
                 className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700/50 transition-colors text-slate-700 dark:text-slate-300"
                 title="Change Language"
               >
@@ -121,7 +127,10 @@ export function AppShell({
 
               {/* Theme Toggle */}
               <button
-                onClick={onThemeToggle}
+                onClick={() => {
+                  console.log('[AppShell] Theme toggle clicked');
+                  onThemeToggle?.();
+                }}
                 className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700/50 transition-colors text-slate-700 dark:text-slate-300"
                 title={isDark ? 'Light Mode' : 'Dark Mode'}
               >
@@ -134,7 +143,10 @@ export function AppShell({
 
               {/* Settings */}
               <button
-                onClick={onSettingsClick}
+                onClick={() => {
+                  console.log('[AppShell] Settings button clicked');
+                  onSettingsClick?.();
+                }}
                 className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700/50 transition-colors text-slate-700 dark:text-slate-300"
                 title="Settings"
               >
