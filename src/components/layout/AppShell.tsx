@@ -34,8 +34,6 @@ export function AppShell({
   currency,
   currencyPair,
   exchangeRates = {},
-  isFetchingRates = false,
-  onRefreshRates,
   currentPage = 'dashboard',
   onNavigate,
   onThemeToggle,

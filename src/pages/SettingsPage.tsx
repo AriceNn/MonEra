@@ -1,9 +1,7 @@
 import { useRef, useState } from 'react';
 import { Download, Upload, Cloud, CloudOff, RotateCcw, AlertCircle } from 'lucide-react';
-import { Input } from '../components/ui/Input';
 import { Select } from '../components/ui/Select';
 import { Modal } from '../components/ui/Modal';
-import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
 import { useFinance } from '../hooks/useFinance';
 import { useAuth } from '../context/AuthContext';
@@ -587,7 +585,7 @@ export function SettingsPage({ isOpen, onClose, onRefreshRates, isFetchingRates 
       {/* Import Mode Dialog */}
       {showImportModeDialog && pendingImportData && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={handleCancelImport}>
-          <Card className="max-w-md w-full shadow-xl" onClick={(e) => e.stopPropagation()}>
+          <Card className="max-w-md w-full shadow-xl" onClick={(e: React.MouseEvent) => e.stopPropagation()}>
             <div className="p-6 space-y-4">
               <div className="flex items-start gap-3">
                 <AlertCircle className="w-5 h-5 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
