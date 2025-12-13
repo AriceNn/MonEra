@@ -10,7 +10,6 @@ import { dateToISOString } from '../../utils/formatters';
 import { t, translateCategory } from '../../utils/i18n';
 import { useFinance } from '../../hooks/useFinance';
 import { useAlert } from '../../hooks/useAlert';
-import { calculateNextOccurrence } from '../../utils/recurringUtils';
 
 interface TransactionFormProps {
   mode: 'add' | 'edit';
