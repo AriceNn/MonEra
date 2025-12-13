@@ -1,8 +1,10 @@
 import { useRef, useState } from 'react';
-import { Download, Upload, Cloud, CloudOff } from 'lucide-react';
+import { Download, Upload, Cloud, CloudOff, RotateCcw, AlertCircle } from 'lucide-react';
 import { Input } from '../components/ui/Input';
 import { Select } from '../components/ui/Select';
 import { Modal } from '../components/ui/Modal';
+import { Button } from '../components/ui/Button';
+import { Card } from '../components/ui/Card';
 import { useFinance } from '../hooks/useFinance';
 import { useAuth } from '../context/AuthContext';
 import { signOut } from '../lib/supabase';
@@ -13,14 +15,15 @@ import type { AppSettings } from '../types';
 interface SettingsPageProps {
   isOpen: boolean;
   onClose: () => void;
+  onRefreshRates?: () => void;
+  isFetchingRates?: boolean;
 }
 
-export function SettingsPage({ isOpen, onClose }: SettingsPageProps) {
+export function SettingsPage({ isOpen, onClose, onRefreshRates, isFetchingRates = false }: SettingsPageProps) {
   const { settings, updateSettings, transactions, addBulkTransactions } = useFinance();
   const { user, isAuthenticated, isCloudEnabled } = useAuth();
   const { downloadJSON, downloadCSV, importFromJSON, importFromCSV } = useDataExportImport();
   const [formData, setFormData] = useState<AppSettings>(settings);
-  const [errors, setErrors] = useState<Record<string, string>>({});
   const [importMessage, setImportMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [showImportModeDialog, setShowImportModeDialog] = useState(false);
@@ -241,22 +244,7 @@ export function SettingsPage({ isOpen, onClose }: SettingsPageProps) {
   };
 
   const validateForm = () => {
-    const newErrors: Record<string, string> = {};
-
-    if (formData.inflationRate < 0) {
-      newErrors.inflationRate = settings.language === 'tr'
-        ? 'Enflasyon oranı 0 veya daha büyük olmalıdır'
-        : 'Inflation rate must be 0 or greater';
-    }
-
-    if (formData.inflationRate > 1000) {
-      newErrors.inflationRate = settings.language === 'tr'
-        ? 'Enflasyon oranı 1000\'den küçük olmalıdır'
-        : 'Inflation rate must be less than 1000';
-    }
-
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
+    return true;
   };
 
   const handleSave = async () => {
@@ -300,7 +288,6 @@ export function SettingsPage({ isOpen, onClose }: SettingsPageProps) {
 
   const handleCancel = () => {
     setFormData(settings);
-    setErrors({});
     onClose();
   };
 
@@ -310,16 +297,18 @@ export function SettingsPage({ isOpen, onClose }: SettingsPageProps) {
       onClose={handleCancel}
       title={settings.language === 'tr' ? 'Ayarlar' : 'Settings'}
     >
-      <div className="space-y-6">
-        {/* Basic Settings */}
-        <section className="border border-slate-200 dark:border-slate-700 rounded-lg p-4">
-          <h3 className="text-sm font-semibold text-slate-900 dark:text-white mb-4">
-            {settings.language === 'tr' ? 'Genel Ayarlar' : 'General Settings'}
+      <div className="space-y-6 max-h-[70vh] overflow-y-auto pr-2">
+        {/* Appearance Section */}
+        <section className="space-y-3">
+          <h3 className="text-sm font-semibold text-slate-900 dark:text-white flex items-center gap-2">
+            <span>🎨</span>
+            {settings.language === 'tr' ? 'Görünüm' : 'Appearance'}
           </h3>
-
-          <div className="space-y-4">
+          
+          <Card className="p-4 space-y-4">
+            {/* Language */}
             <div>
-              <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">
+              <label htmlFor="language-select" className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-2">
                 {settings.language === 'tr' ? 'Dil' : 'Language'}
               </label>
               <Select
@@ -332,8 +321,9 @@ export function SettingsPage({ isOpen, onClose }: SettingsPageProps) {
               />
             </div>
 
+            {/* Theme */}
             <div>
-              <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">
+              <label htmlFor="theme-select" className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-2">
                 {settings.language === 'tr' ? 'Tema' : 'Theme'}
               </label>
               <Select
@@ -345,26 +335,55 @@ export function SettingsPage({ isOpen, onClose }: SettingsPageProps) {
                 ]}
               />
             </div>
+          </Card>
+        </section>
 
+        {/* Currency Section */}
+        <section className="space-y-3">
+          <h3 className="text-sm font-semibold text-slate-900 dark:text-white flex items-center gap-2">
+            <span>💱</span>
+            {settings.language === 'tr' ? 'Para Birimi' : 'Currency'}
+          </h3>
+          
+          <Card className="p-4 space-y-3">
+            {/* Standart Para Birimi */}
             <div>
-              <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">
-                {settings.language === 'tr' ? 'Para Birimi' : 'Currency'}
+              <label htmlFor="currency-select" className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-2">
+                {settings.language === 'tr' ? 'Standart Para Birimi' : 'Default Currency'}
               </label>
-              <Select
-                value={formData.currency}
-                onChange={(e) => setFormData({ ...formData, currency: e.target.value as any })}
-                options={[
-                  { value: 'TRY', label: 'TRY (₺)' },
-                  { value: 'USD', label: 'USD ($)' },
-                  { value: 'EUR', label: 'EUR (€)' },
-                  { value: 'GBP', label: 'GBP (£)' },
-                ]}
-              />
+              <div className="flex gap-3 items-end">
+                <div className="w-1/2">
+                  <Select
+                    value={formData.currency}
+                    onChange={(e) => setFormData({ ...formData, currency: e.target.value as any })}
+                    options={[
+                      { value: 'TRY', label: 'TRY (₺)' },
+                      { value: 'USD', label: 'USD ($)' },
+                      { value: 'EUR', label: 'EUR (€)' },
+                      { value: 'GBP', label: 'GBP (£)' },
+                    ]}
+                  />
+                </div>
+                <div className="flex flex-col gap-1 flex-1">
+                  <label className="text-xs font-medium text-slate-600 dark:text-slate-400">
+                    {settings.language === 'tr' ? 'Kuru Yenile' : 'Refresh Rate'}
+                  </label>
+                  <button
+                    onClick={onRefreshRates}
+                    disabled={isFetchingRates}
+                    title={settings.language === 'tr' ? 'Kurları güncelle' : 'Refresh exchange rates'}
+                    className="px-3 rounded-lg bg-indigo-600 hover:bg-indigo-700 dark:bg-indigo-600 dark:hover:bg-indigo-700 text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1.5 h-9"
+                  >
+                    <RotateCcw className={`w-4 h-4 ${isFetchingRates ? 'animate-spin' : ''}`} />
+                  </button>
+                </div>
+              </div>
             </div>
 
+            {/* Kur Çifti */}
             <div>
-              <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">
-                {settings.language === 'tr' ? 'Kur Çifti Gösterimi' : 'Currency Pair Display'}
+              <label htmlFor="pair-select" className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-2">
+                {settings.language === 'tr' ? 'Kur Çifti (Header)' : 'Currency Pair (Header)'}
               </label>
               <Select
                 value={formData.currencyPair || 'TRY-USD'}
@@ -380,122 +399,106 @@ export function SettingsPage({ isOpen, onClose }: SettingsPageProps) {
                   { value: 'USD-GBP', label: 'USD/GBP ($/£)' },
                 ]}
               />
-              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-2">
                 {settings.language === 'tr' 
-                  ? 'Header\'da gösterilecek kur çiftini seçin' 
-                  : 'Select currency pair to display in header'}
+                  ? 'Header\'da gösterilecek kur çiftini seçin ve çifte göre para birimi değiştirir.' 
+                  : 'Choose the currency pair displayed in the header. Currency toggle will switch between them.'}
               </p>
             </div>
-
-            <div>
-              <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-1">
-                {settings.language === 'tr' ? 'Yıllık Enflasyon Oranı (%)' : 'Annual Inflation Rate (%)'}
-              </label>
-              <Input
-                type="number"
-                value={formData.inflationRate}
-                onChange={(e) => setFormData({ ...formData, inflationRate: parseFloat(e.target.value) || 0 })}
-                error={errors.inflationRate}
-                step="0.1"
-                min="0"
-                max="1000"
-              />
-            </div>
-          </div>
+          </Card>
         </section>
 
         {/* Cloud Sync Section */}
-        <section className="border border-slate-200 dark:border-slate-700 rounded-lg p-4">
-          <h3 className="text-sm font-semibold text-slate-900 dark:text-white mb-4">
-            {settings.language === 'tr' ? 'Bulut Senkronizasyonu' : 'Cloud Sync'}
-          </h3>
-
-          <div className="space-y-4">
-            {isCloudEnabled && isAuthenticated ? (
+        {isCloudEnabled && (
+          <section className="space-y-3">
+            <h3 className="text-sm font-semibold text-slate-900 dark:text-white flex items-center gap-2">
+              <span>☁️</span>
+              {settings.language === 'tr' ? 'Bulut Senkronizasyonu' : 'Cloud Sync'}
+            </h3>
+            
+            <Card className="p-4 space-y-3">
+              {isAuthenticated ? (
                 <>
-                  {/* User Info */}
-                  <div className="flex items-center gap-3 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
-                    <Cloud size={18} className="text-blue-600 dark:text-blue-400" />
-                    <div className="flex-1">
-                      <p className="text-sm font-medium text-blue-900 dark:text-blue-100">
+                  {/* User Info Card */}
+                  <div className="flex items-start gap-3 p-3 bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-200 dark:border-indigo-800 rounded-lg">
+                    <Cloud size={18} className="text-indigo-600 dark:text-indigo-400 flex-shrink-0 mt-0.5" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-indigo-900 dark:text-indigo-100">
                         {settings.language === 'tr' ? 'Bulut Aktif' : 'Cloud Active'}
                       </p>
-                      <p className="text-xs text-blue-700 dark:text-blue-300">
+                      <p className="text-xs text-indigo-700 dark:text-indigo-300 truncate">
                         {user?.email}
                       </p>
                     </div>
                   </div>
                   
-                  {/* Sync Status Indicator */}
+                  {/* Sync Status */}
                   <SyncStatusIndicator />
                   
-                  {/* Logout Button */}
+                  {/* Sign Out Button */}
                   <button
                     onClick={handleLogout}
-                    className="w-full px-3 py-2.5 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 hover:bg-red-100 dark:hover:bg-red-900/30 text-red-700 dark:text-red-300 transition-colors text-xs font-medium"
+                    className="w-full px-3 py-2.5 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 hover:bg-red-100 dark:hover:bg-red-900/30 text-red-700 dark:text-red-300 transition-colors text-sm font-medium focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900"
                   >
-                  {settings.language === 'tr' ? 'Çıkış Yap' : 'Sign Out'}
-                </button>
-              </>
-            ) : !isCloudEnabled ? (
-              <div className="flex items-center gap-3 p-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg">
-                <CloudOff size={18} className="text-slate-500 dark:text-slate-400" />
-                <div className="flex-1">
-                  <p className="text-sm font-medium text-slate-900 dark:text-white">
-                    {settings.language === 'tr' ? 'Bulut devre dışı' : 'Cloud disabled'}
-                  </p>
-                  <p className="text-xs text-slate-600 dark:text-slate-400">
-                    {settings.language === 'tr' 
-                      ? 'Verileriniz sadece bu cihazda saklanır' 
-                      : 'Your data is stored locally only'}
-                  </p>
+                    {settings.language === 'tr' ? '🚪 Çıkış Yap' : '🚪 Sign Out'}
+                  </button>
+                </>
+              ) : (
+                <div className="flex items-start gap-3 p-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg">
+                  <CloudOff size={18} className="text-slate-500 dark:text-slate-400 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <p className="text-sm font-medium text-slate-900 dark:text-white">
+                      {settings.language === 'tr' ? 'Bulut Devre Dışı' : 'Cloud Disabled'}
+                    </p>
+                    <p className="text-xs text-slate-600 dark:text-slate-400">
+                      {settings.language === 'tr' 
+                        ? 'Verileriniz sadece bu cihazda saklanır.' 
+                        : 'Your data is stored locally only.'}
+                    </p>
+                  </div>
                 </div>
-              </div>
-            ) : (
-              <SyncStatusIndicator />
-            )}
-          </div>
-        </section>        {/* Data Management */}
-        <section className="border border-slate-200 dark:border-slate-700 rounded-lg p-4">
-          <h3 className="text-sm font-semibold text-slate-900 dark:text-white mb-4">
+              )}
+            </Card>
+          </section>
+        )}
+
+        {/* Data Management Section */}
+        <section className="space-y-3">
+          <h3 className="text-sm font-semibold text-slate-900 dark:text-white flex items-center gap-2">
+            <span>📦</span>
             {settings.language === 'tr' ? 'Veri Yönetimi' : 'Data Management'}
           </h3>
-
-          <div className="space-y-4">
-            {/* Export Subsection */}
+          
+          <Card className="p-4 space-y-4">
+            {/* Export */}
             <div>
-              <p className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                {settings.language === 'tr' ? '💾 Dışa Aktar' : '💾 Export'}
+              <p className="text-xs font-semibold text-slate-700 dark:text-slate-300 mb-2 flex items-center gap-1.5">
+                <Download size={14} />
+                {settings.language === 'tr' ? 'Dışa Aktar' : 'Export'}
               </p>
               <div className="grid grid-cols-2 gap-2">
                 <button
                   onClick={handleExportJSON}
-                  className="flex items-center justify-center gap-2 px-3 py-2.5 rounded-lg bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 hover:bg-emerald-100 dark:hover:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 transition-colors text-xs font-medium"
                   disabled={isProcessing}
+                  className="px-3 py-2.5 rounded-lg bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 hover:bg-emerald-100 dark:hover:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 transition-colors text-xs font-medium disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900"
                 >
-                  <Download size={14} />
                   JSON
                 </button>
                 <button
                   onClick={handleExportCSV}
-                  className="flex items-center justify-center gap-2 px-3 py-2.5 rounded-lg bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 hover:bg-emerald-100 dark:hover:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 transition-colors text-xs font-medium"
                   disabled={isProcessing}
+                  className="px-3 py-2.5 rounded-lg bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 hover:bg-emerald-100 dark:hover:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 transition-colors text-xs font-medium disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900"
                 >
-                  <Download size={14} />
                   CSV
                 </button>
               </div>
-              <p className="text-xs text-slate-500 dark:text-slate-400 mt-2">
-                {settings.language === 'tr'
-                  ? 'Tüm işlemlerinizi yedekleyin'
-                  : 'Backup all your transactions'}
-              </p>
             </div>
 
-            {/* Import Subsection */}
+            {/* Import */}
             <div>
-              <p className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                {settings.language === 'tr' ? '📤 İçe Aktar' : '📤 Import'}
+              <p className="text-xs font-semibold text-slate-700 dark:text-slate-300 mb-2 flex items-center gap-1.5">
+                <Upload size={14} />
+                {settings.language === 'tr' ? 'İçe Aktar' : 'Import'}
               </p>
               <div className="grid grid-cols-2 gap-2">
                 <div>
@@ -510,15 +513,14 @@ export function SettingsPage({ isOpen, onClose }: SettingsPageProps) {
                       }
                     }}
                     className="hidden"
-                    id="json-import-input"
+                    id="json-import"
                   />
                   <button
                     onClick={() => jsonInputRef.current?.click()}
                     disabled={isProcessing}
-                    className="w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-lg bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 hover:bg-blue-100 dark:hover:bg-blue-900/30 text-blue-700 dark:text-blue-300 transition-colors text-xs font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="w-full px-3 py-2.5 rounded-lg bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 hover:bg-blue-100 dark:hover:bg-blue-900/30 text-blue-700 dark:text-blue-300 transition-colors text-xs font-medium disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900"
                   >
-                    <Upload size={14} />
-                    {isProcessing ? '...' : 'JSON'}
+                    JSON
                   </button>
                 </div>
 
@@ -534,34 +536,31 @@ export function SettingsPage({ isOpen, onClose }: SettingsPageProps) {
                       }
                     }}
                     className="hidden"
-                    id="csv-import-input"
+                    id="csv-import"
                   />
                   <button
                     onClick={() => csvInputRef.current?.click()}
                     disabled={isProcessing}
-                    className="w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-lg bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 hover:bg-blue-100 dark:hover:bg-blue-900/30 text-blue-700 dark:text-blue-300 transition-colors text-xs font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="w-full px-3 py-2.5 rounded-lg bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 hover:bg-blue-100 dark:hover:bg-blue-900/30 text-blue-700 dark:text-blue-300 transition-colors text-xs font-medium disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900"
                   >
-                    <Upload size={14} />
-                    {isProcessing ? '...' : 'CSV'}
+                    CSV
                   </button>
                 </div>
               </div>
-              <p className="text-xs text-slate-500 dark:text-slate-400 mt-2">
-                {settings.language === 'tr'
-                  ? 'Daha önce yedeklenen verileri geri yükleyin'
-                  : 'Restore previously backed up data'}
-              </p>
             </div>
-          </div>
+          </Card>
 
           {/* Status Message */}
           {importMessage && (
-            <div className={`mt-4 p-3 rounded-lg text-xs font-medium ${
+            <div className={`p-3 rounded-lg text-xs font-medium flex items-start gap-2 ${
               importMessage.type === 'success'
                 ? 'bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-200'
                 : 'bg-rose-50 dark:bg-rose-900/20 border border-rose-200 dark:border-rose-800 text-rose-700 dark:text-rose-200'
             }`}>
-              {importMessage.type === 'success' ? '✓ ' : '✕ '}{importMessage.text}
+              <span className="flex-shrink-0 mt-0.5">
+                {importMessage.type === 'success' ? '✓' : '✕'}
+              </span>
+              <span>{importMessage.text}</span>
             </div>
           )}
         </section>
@@ -570,14 +569,14 @@ export function SettingsPage({ isOpen, onClose }: SettingsPageProps) {
         <div className="flex justify-end gap-2 pt-4 border-t border-slate-200 dark:border-slate-700">
           <button
             onClick={handleCancel}
-            className="px-4 py-2 text-sm font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700/50 rounded-lg transition-colors"
+            className="px-4 py-2.5 text-sm font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700/50 rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-slate-400 focus:ring-offset-2 dark:focus:ring-offset-slate-900"
             disabled={isProcessing}
           >
             {settings.language === 'tr' ? 'İptal' : 'Cancel'}
           </button>
           <button
             onClick={handleSave}
-            className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="px-4 py-2.5 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900"
             disabled={isProcessing}
           >
             {settings.language === 'tr' ? 'Kaydet' : 'Save'}
@@ -587,54 +586,61 @@ export function SettingsPage({ isOpen, onClose }: SettingsPageProps) {
       
       {/* Import Mode Dialog */}
       {showImportModeDialog && pendingImportData && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={handleCancelImport}>
-          <div className="bg-white dark:bg-slate-800 rounded-lg p-6 max-w-md w-full mx-4 shadow-xl" onClick={(e) => e.stopPropagation()}>
-            <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-3">
-              {settings.language === 'tr' ? 'İçe Aktarma Modu' : 'Import Mode'}
-            </h3>
-            <p className="text-sm text-slate-600 dark:text-slate-300 mb-6">
-              {settings.language === 'tr' 
-                ? `${pendingImportData.count} işlem içe aktarılacak. Mevcut ${transactions.length} işleminiz var. Ne yapmak istersiniz?`
-                : `${pendingImportData.count} transactions will be imported. You have ${transactions.length} existing transactions. What would you like to do?`}
-            </p>
-            
-            <div className="space-y-3">
-              <button
-                onClick={() => handleConfirmImport(false)}
-                className="w-full px-4 py-3 text-sm font-medium text-left bg-blue-50 dark:bg-blue-900/20 border-2 border-blue-200 dark:border-blue-800 hover:bg-blue-100 dark:hover:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-lg transition-colors"
-              >
-                <div className="font-semibold mb-1">
-                  {settings.language === 'tr' ? '➕ Mevcut Verilere Ekle' : '➕ Add to Existing Data'}
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={handleCancelImport}>
+          <Card className="max-w-md w-full shadow-xl" onClick={(e) => e.stopPropagation()}>
+            <div className="p-6 space-y-4">
+              <div className="flex items-start gap-3">
+                <AlertCircle className="w-5 h-5 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
+                <div>
+                  <h3 className="font-semibold text-slate-900 dark:text-white">
+                    {settings.language === 'tr' ? 'İçe Aktarma Modu' : 'Import Mode'}
+                  </h3>
+                  <p className="text-sm text-slate-600 dark:text-slate-300 mt-1">
+                    {settings.language === 'tr' 
+                      ? `${pendingImportData.count} işlem bulundu. Mevcut ${transactions.length} işleminiz var.`
+                      : `${pendingImportData.count} transactions found. You have ${transactions.length} existing.`}
+                  </p>
                 </div>
-                <div className="text-xs opacity-75">
-                  {settings.language === 'tr' 
-                    ? 'Yeni veriler mevcut verilerinize eklenecek (duplicate kontrol edilir)'
-                    : 'New data will be added to your existing data (duplicates filtered)'}
-                </div>
-              </button>
+              </div>
               
-              <button
-                onClick={() => handleConfirmImport(true)}
-                className="w-full px-4 py-3 text-sm font-medium text-left bg-orange-50 dark:bg-orange-900/20 border-2 border-orange-200 dark:border-orange-800 hover:bg-orange-100 dark:hover:bg-orange-900/30 text-orange-700 dark:text-orange-300 rounded-lg transition-colors"
-              >
-                <div className="font-semibold mb-1">
-                  {settings.language === 'tr' ? '🔄 Tüm Veriyi Değiştir' : '🔄 Replace All Data'}
-                </div>
-                <div className="text-xs opacity-75">
-                  {settings.language === 'tr' 
-                    ? 'Mevcut tüm veriler silinecek ve yeni veriler yüklenecek'
-                    : 'All existing data will be deleted and new data will be loaded'}
-                </div>
-              </button>
-              
-              <button
-                onClick={handleCancelImport}
-                className="w-full px-4 py-2 text-sm font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors"
-              >
-                {settings.language === 'tr' ? 'İptal' : 'Cancel'}
-              </button>
+              <div className="space-y-2 pt-2">
+                <button
+                  onClick={() => handleConfirmImport(false)}
+                  className="w-full text-left px-4 py-3 rounded-lg bg-blue-50 dark:bg-blue-900/20 border-2 border-blue-200 dark:border-blue-800 hover:bg-blue-100 dark:hover:bg-blue-900/30 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900"
+                >
+                  <div className="font-semibold text-blue-900 dark:text-blue-100 text-sm">
+                    {settings.language === 'tr' ? '➕ Mevcut Verilere Ekle' : '➕ Add to Existing'}
+                  </div>
+                  <div className="text-xs text-blue-700 dark:text-blue-300 mt-0.5">
+                    {settings.language === 'tr' 
+                      ? 'Yeni veriler eklenecek (duplikatlar filtrelenir)'
+                      : 'New data will be added (duplicates filtered)'}
+                  </div>
+                </button>
+                
+                <button
+                  onClick={() => handleConfirmImport(true)}
+                  className="w-full text-left px-4 py-3 rounded-lg bg-orange-50 dark:bg-orange-900/20 border-2 border-orange-200 dark:border-orange-800 hover:bg-orange-100 dark:hover:bg-orange-900/30 transition-colors focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900"
+                >
+                  <div className="font-semibold text-orange-900 dark:text-orange-100 text-sm">
+                    {settings.language === 'tr' ? '🔄 Tüm Veriyi Değiştir' : '🔄 Replace All'}
+                  </div>
+                  <div className="text-xs text-orange-700 dark:text-orange-300 mt-0.5">
+                    {settings.language === 'tr' 
+                      ? 'Mevcut tüm veriler silinecek'
+                      : 'All existing data will be deleted'}
+                  </div>
+                </button>
+                
+                <button
+                  onClick={handleCancelImport}
+                  className="w-full px-4 py-2.5 text-sm font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-slate-400 focus:ring-offset-2 dark:focus:ring-offset-slate-900"
+                >
+                  {settings.language === 'tr' ? 'İptal' : 'Cancel'}
+                </button>
+              </div>
             </div>
-          </div>
+          </Card>
         </div>
       )}
     </Modal>

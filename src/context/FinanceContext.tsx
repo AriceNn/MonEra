@@ -25,7 +25,7 @@ export interface FinanceContextType {
   
   // Recurring transaction actions (P2 Sprint 1)
   addRecurringTransaction: (recurring: Omit<RecurringTransaction, 'id'>) => Promise<string>;
-  updateRecurringTransaction: (id: string, updates: Partial<Omit<RecurringTransaction, 'id'>>) => Promise<boolean>;
+  updateRecurringTransaction: (id: string, updates: Partial<Omit<RecurringTransaction, 'id'>>, applyToExisting?: boolean) => Promise<boolean>;
   deleteRecurringTransaction: (id: string) => Promise<void>;
   toggleRecurringActive: (id: string) => Promise<void>;
   generateRecurringTransactions: () => Promise<number>;
@@ -933,7 +933,7 @@ export function FinanceProvider({ children, exchangeRates = {} }: FinanceProvide
   );
 
   const updateRecurringTransaction = useCallback(
-    async (id: string, updates: Partial<Omit<RecurringTransaction, 'id'>>): Promise<boolean> => {
+    async (id: string, updates: Partial<Omit<RecurringTransaction, 'id'>>, applyToExisting = false): Promise<boolean> => {
       const user = await getCurrentUser();
       if (!user || !isAuthenticated) {
         console.error('[FinanceContext] Not authenticated');
@@ -961,6 +961,28 @@ export function FinanceProvider({ children, exchangeRates = {} }: FinanceProvide
         return false;
       }
 
+      // If applyToExisting is true, update generated transactions too
+      if (applyToExisting) {
+        // Update existing transactions that were generated from this recurring transaction
+        const updatePayload: any = {};
+        if (updates.title !== undefined) updatePayload.title = updates.title;
+        if (updates.category !== undefined) updatePayload.category = updates.category;
+        if (updates.description !== undefined) updatePayload.description = updates.description;
+
+        if (Object.keys(updatePayload).length > 0) {
+          const { error: updateError } = await supabase
+            .from('transactions')
+            .update(updatePayload)
+            .eq('recurring_id', id)
+            .eq('user_id', user.id);
+
+          if (updateError) {
+            console.error('[FinanceContext] Error updating generated transactions:', updateError);
+            // Don't fail the entire operation, just log the error
+          }
+        }
+      }
+
       // Update state
       let updated = false;
       setRecurringTransactions((prev) => {
@@ -973,6 +995,23 @@ export function FinanceProvider({ children, exchangeRates = {} }: FinanceProvide
         updated = true;
         return next;
       });
+
+      // If applyToExisting, also update local transaction state
+      if (applyToExisting && updated) {
+        setTransactions((prev) => {
+          return prev.map((t) => {
+            if (t.recurringId === id) {
+              const updated: Transaction = { ...t };
+              if (updates.title !== undefined) updated.title = updates.title;
+              if (updates.category !== undefined) updated.category = updates.category;
+              if (updates.description !== undefined) updated.description = updates.description;
+              return updated;
+            }
+            return t;
+          });
+        });
+      }
+
       return updated;
     },
     [isAuthenticated]

@@ -204,8 +204,8 @@ export function RecurringTransactionsPage({ language, currency }: RecurringTrans
           language={language}
           currency={currency}
           onClose={() => setEditingRecurring(null)}
-          onSave={(updates) => {
-            updateRecurringTransaction(editingRecurring.id, updates);
+          onSave={(updates, applyToExisting) => {
+            updateRecurringTransaction(editingRecurring.id, updates, applyToExisting);
             setEditingRecurring(null);
           }}
         />
@@ -223,7 +223,7 @@ interface EditRecurringModalProps {
   language: 'tr' | 'en';
   currency: 'TRY' | 'USD' | 'EUR' | 'GBP';
   onClose: () => void;
-  onSave: (updates: Partial<Omit<RecurringTransaction, 'id' | 'isActive'>>) => void;
+  onSave: (updates: Partial<Omit<RecurringTransaction, 'id' | 'isActive'>>, applyToExisting?: boolean) => void;
 }
 
 function EditRecurringModal({ recurring, language, onClose, onSave }: EditRecurringModalProps) {
@@ -235,6 +235,7 @@ function EditRecurringModal({ recurring, language, onClose, onSave }: EditRecurr
     endDate: recurring.endDate || '',
     description: recurring.description || '',
   });
+  const [applyToExisting, setApplyToExisting] = useState(false);
 
   const handleSubmit = () => {
     onSave({
@@ -244,7 +245,7 @@ function EditRecurringModal({ recurring, language, onClose, onSave }: EditRecurr
       frequency: formData.frequency,
       endDate: formData.endDate || undefined,
       description: formData.description || undefined,
-    });
+    }, applyToExisting);
   };
 
   const getCategoryOptions = () => {
@@ -312,6 +313,27 @@ function EditRecurringModal({ recurring, language, onClose, onSave }: EditRecurr
           value={formData.description}
           onChange={(e) => setFormData({ ...formData, description: e.target.value })}
         />
+
+        <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3 space-y-2">
+          <label className="flex items-center gap-3 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={applyToExisting}
+              onChange={(e) => setApplyToExisting(e.target.checked)}
+              className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+            />
+            <span className="text-sm font-medium text-blue-900 dark:text-blue-200">
+              {language === 'tr'
+                ? 'Önceki işlemleri de güncelle'
+                : 'Update existing transactions'}
+            </span>
+          </label>
+          <p className="text-xs text-blue-700 dark:text-blue-300 ml-7">
+            {language === 'tr'
+              ? 'Daha önce bu işlemden oluşturulan işlemlerin kategori, başlık ve açıklaması da güncellenecek.'
+              : 'Previously generated transactions will also be updated with the new category, title, and description.'}
+          </p>
+        </div>
       </div>
     </Modal>
   );

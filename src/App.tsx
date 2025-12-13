@@ -68,6 +68,8 @@ function DashboardContent({ onRatesUpdate }: DashboardContentProps) {
   const [isNotificationSettingsOpen, setIsNotificationSettingsOpen] = useState(false);
   const [currentPage, setCurrentPage] = useState<'dashboard' | 'transactions' | 'recurring' | 'budget' | 'analytics' | 'settings'>('dashboard');
   const [isLoading, setIsLoading] = useState(true);
+  const [exchangeRates, setExchangeRates] = useState<Record<string, number>>({});
+  const [isFetchingRates, setIsFetchingRates] = useState(false);
   
   const currentDate = new Date();
   const [selectedMonth, setSelectedMonth] = useState(currentDate.getMonth());
@@ -128,8 +130,14 @@ function DashboardContent({ onRatesUpdate }: DashboardContentProps) {
   };
 
   const handleCurrencyToggle = () => {
-    const newCurrency = settings.currency === 'TRY' ? 'USD' : 'TRY';
-    console.log(`[handleCurrencyToggle] Toggling currency to: ${newCurrency}`);
+    // Get currencies from the selected currency pair
+    // e.g., "TRY-USD" → [TRY, USD]
+    const currencyPair = settings.currencyPair || 'TRY-USD';
+    const [curr1, curr2] = currencyPair.split('-') as ['TRY' | 'USD' | 'EUR' | 'GBP', 'TRY' | 'USD' | 'EUR' | 'GBP'];
+    
+    // Toggle between the two currencies in the pair
+    const newCurrency = settings.currency === curr1 ? curr2 : curr1;
+    console.log(`[handleCurrencyToggle] Toggling currency from ${settings.currency} to ${newCurrency} (pair: ${currencyPair})`);
     
     // Optimistic update - change immediately
     updateSettings({ currency: newCurrency }).then((success) => {
@@ -142,6 +150,22 @@ function DashboardContent({ onRatesUpdate }: DashboardContentProps) {
       console.error('[handleCurrencyToggle] Error:', error);
     });
   };
+
+  const handleRefreshRates = useCallback(async () => {
+    setIsFetchingRates(true);
+    try {
+      const base = settings.currency || 'USD';
+      console.log('[App] Manually refreshing rates');
+      const rates = await fetchLatestRates(base);
+      setExchangeRates(rates);
+      updateExchangeRates(rates);
+      onRatesUpdate(rates);
+    } catch (error) {
+      console.error('[App] Error refreshing rates:', error);
+    } finally {
+      setIsFetchingRates(false);
+    }
+  }, [settings.currency]);
 
   const handleMonthChange = (month: number, year: number) => {
     setSelectedMonth(month);
@@ -220,13 +244,17 @@ function DashboardContent({ onRatesUpdate }: DashboardContentProps) {
     
     const fetchRates = async () => {
       // First, load any cached rates immediately for instant display
-      loadPersistedRates();
+      const cached = loadPersistedRates();
+      if (cached?.rates) {
+        setExchangeRates(cached.rates);
+      }
       
       // Then fetch fresh rates from API
       const base = settings.currency || 'USD';
-      console.log('[App] Fetching fresh rates on mount/currency change');
+      console.log('[App] Fetching fresh rates');
       const rates = await fetchLatestRates(base);
       if (!cancelled) {
+        setExchangeRates(rates);
         updateExchangeRates(rates);
         onRatesUpdate(rates); // Update parent state
       }
@@ -241,6 +269,10 @@ function DashboardContent({ onRatesUpdate }: DashboardContentProps) {
       theme={settings.theme}
       language={settings.language}
       currency={settings.currency}
+      currencyPair={settings.currencyPair}
+      exchangeRates={exchangeRates}
+      isFetchingRates={isFetchingRates}
+      onRefreshRates={handleRefreshRates}
       currentPage={currentPage}
       onNavigate={setCurrentPage}
       onThemeToggle={handleThemeToggle}
@@ -376,7 +408,7 @@ function DashboardContent({ onRatesUpdate }: DashboardContentProps) {
       )}
 
       {/* Settings Modal */}
-      <SettingsPage isOpen={isSettingsOpen || currentPage === 'settings'} onClose={() => { setIsSettingsOpen(false); setCurrentPage('dashboard'); }} />
+      <SettingsPage isOpen={isSettingsOpen || currentPage === 'settings'} onClose={() => { setIsSettingsOpen(false); setCurrentPage('dashboard'); }} onRefreshRates={handleRefreshRates} isFetchingRates={isFetchingRates} />
 
       {/* Notification Settings Modal */}
       {isNotificationSettingsOpen && (

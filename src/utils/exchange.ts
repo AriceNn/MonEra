@@ -11,6 +11,8 @@ const EXCHANGE_RATES: Record<string, number> = {
   TRY: 32.5, // Approximate; should be updated via API
 };
 
+let lastRatesUpdate: Date | null = null;
+
 /**
  * Convert amount from one currency to another
  * @param amount - Amount to convert
@@ -63,6 +65,7 @@ export function getExchangeRate(fromCurrency: string, toCurrency: string): numbe
  */
 export function updateExchangeRates(rates: Record<string, number>): void {
   Object.assign(EXCHANGE_RATES, rates);
+  lastRatesUpdate = new Date();
   try {
     const payload = { rates: EXCHANGE_RATES, updatedAt: new Date().toISOString() };
     window.localStorage.setItem('monera_exchange_rates', JSON.stringify(payload));
@@ -76,6 +79,13 @@ export function updateExchangeRates(rates: Record<string, number>): void {
  */
 export function getExchangeRates(): Record<string, number> {
   return { ...EXCHANGE_RATES };
+}
+
+/**
+ * Get last rates update timestamp
+ */
+export function getLastRatesUpdate(): Date | null {
+  return lastRatesUpdate;
 }
 
 /**
