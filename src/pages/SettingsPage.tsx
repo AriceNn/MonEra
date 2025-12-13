@@ -585,7 +585,8 @@ export function SettingsPage({ isOpen, onClose, onRefreshRates, isFetchingRates 
       {/* Import Mode Dialog */}
       {showImportModeDialog && pendingImportData && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={handleCancelImport}>
-          <Card className="max-w-md w-full shadow-xl" onClick={(e: any) => e.stopPropagation()}>
+          <div onClick={(e: any) => e.stopPropagation()}>
+            <Card className="max-w-md w-full shadow-xl">
             <div className="p-6 space-y-4">
               <div className="flex items-start gap-3">
                 <AlertCircle className="w-5 h-5 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
@@ -638,7 +639,8 @@ export function SettingsPage({ isOpen, onClose, onRefreshRates, isFetchingRates 
                 </button>
               </div>
             </div>
-          </Card>
+            </Card>
+          </div>
         </div>
       )}
     </Modal>
