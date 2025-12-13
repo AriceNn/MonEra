@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useCallback } from 'react';
+import { useState, useMemo, useEffect, useCallback, Suspense, lazy } from 'react';
 import type { Transaction } from './types';
 import { FinanceProvider } from './context/FinanceContext';
 import { useFinance } from './hooks/useFinance';
@@ -9,11 +9,6 @@ import { RecentTransactions } from './components/dashboard/RecentTransactions';
 import { MonthSelector } from './components/dashboard/MonthSelector';
 import { Charts } from './components/dashboard/Charts';
 import { TransactionForm } from './components/transactions/TransactionForm';
-import { SettingsPage } from './pages/SettingsPage';
-import { RecurringTransactionsPage } from './pages/RecurringTransactionsPage';
-import { BudgetPage } from './pages/BudgetPage';
-import { TransactionsPage } from './pages/TransactionsPage';
-import { AnalyticsPage } from './pages/AnalyticsPage';
 import { NotificationSettingsPanel } from './components/notifications/NotificationSettingsPanel';
 import { SkeletonDashboard } from './components/ui/Skeleton';
 import { NoTransactionsEmpty } from './components/ui/EmptyState';
@@ -21,6 +16,22 @@ import { AuthForm } from './components/auth/AuthForm';
 import { generateFinancialSummary } from './utils/calculations';
 import { convertCurrency, fetchLatestRates, updateExchangeRates, loadPersistedRates } from './utils/exchange';
 import './index.css';
+
+// Lazy load heavy pages
+const SettingsPage = lazy(() => import('./pages/SettingsPage').then(m => ({ default: m.SettingsPage })));
+const RecurringTransactionsPage = lazy(() => import('./pages/RecurringTransactionsPage').then(m => ({ default: m.RecurringTransactionsPage })));
+const BudgetPage = lazy(() => import('./pages/BudgetPage').then(m => ({ default: m.BudgetPage })));
+const TransactionsPage = lazy(() => import('./pages/TransactionsPage').then(m => ({ default: m.TransactionsPage })));
+const AnalyticsPage = lazy(() => import('./pages/AnalyticsPage').then(m => ({ default: m.AnalyticsPage })));
+
+// Loading fallback component
+function PageLoader() {
+  return (
+    <div className="flex items-center justify-center min-h-screen">
+      <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-indigo-600"></div>
+    </div>
+  );
+}
 
 // Load test utilities in development
 if (import.meta.env.DEV) {
@@ -371,44 +382,54 @@ function DashboardContent({ onRatesUpdate }: DashboardContentProps) {
 
       {/* Transactions Page */}
       {currentPage === 'transactions' && (
-        <TransactionsPage
+        <Suspense fallback={<PageLoader />}>
+          <TransactionsPage
           language={settings.language}
           currency={settings.currency}
           selectedMonth={selectedMonth}
           selectedYear={selectedYear}
         />
+        </Suspense>
       )}
 
       {/* Recurring Transactions Page */}
       {currentPage === 'recurring' && (
-        <RecurringTransactionsPage
-          language={settings.language}
-          currency={settings.currency}
-        />
+        <Suspense fallback={<PageLoader />}>
+          <RecurringTransactionsPage
+            language={settings.language}
+            currency={settings.currency}
+          />
+        </Suspense>
       )}
 
       {/* Budget Page */}
       {currentPage === 'budget' && (
-        <BudgetPage
-          language={settings.language}
-          currency={settings.currency}
-          selectedMonth={selectedMonth}
-          selectedYear={selectedYear}
-        />
+        <Suspense fallback={<PageLoader />}>
+          <BudgetPage
+            language={settings.language}
+            currency={settings.currency}
+            selectedMonth={selectedMonth}
+            selectedYear={selectedYear}
+          />
+        </Suspense>
       )}
 
       {/* Analytics Page */}
       {currentPage === 'analytics' && (
-        <AnalyticsPage
-          transactions={transactions}
-          language={settings.language}
-          currency={settings.currency}
-          getDisplayAmount={getDisplayAmount}
-        />
+        <Suspense fallback={<PageLoader />}>
+          <AnalyticsPage
+            transactions={transactions}
+            language={settings.language}
+            currency={settings.currency}
+            getDisplayAmount={getDisplayAmount}
+          />
+        </Suspense>
       )}
 
       {/* Settings Modal */}
-      <SettingsPage isOpen={isSettingsOpen || currentPage === 'settings'} onClose={() => { setIsSettingsOpen(false); setCurrentPage('dashboard'); }} onRefreshRates={handleRefreshRates} isFetchingRates={isFetchingRates} />
+      <Suspense fallback={null}>
+        <SettingsPage isOpen={isSettingsOpen || currentPage === 'settings'} onClose={() => { setIsSettingsOpen(false); setCurrentPage('dashboard'); }} onRefreshRates={handleRefreshRates} isFetchingRates={isFetchingRates} />
+      </Suspense>
 
       {/* Notification Settings Modal */}
       {isNotificationSettingsOpen && (
