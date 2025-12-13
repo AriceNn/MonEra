@@ -95,49 +95,52 @@ function DashboardContent({ onRatesUpdate }: DashboardContentProps) {
     });
   }, []); // Empty dependency array - only run on mount
 
-  const handleThemeToggle = async () => {
-    console.log('[handleThemeToggle] Starting...');
+  const handleThemeToggle = () => {
     const newTheme = settings.theme === 'light' ? 'dark' : 'light';
-    console.log(`[handleThemeToggle] Attempting to change to: ${newTheme}`);
-    const success = await updateSettings({ theme: newTheme });
-    console.log(`[handleThemeToggle] updateSettings returned: ${success}`);
-    if (success) {
-      console.log(`[handleThemeToggle] Theme changed to: ${newTheme}`);
-      // Ensure DOM is updated
-      if (newTheme === 'dark') {
-        document.documentElement.classList.add('dark');
+    console.log(`[handleThemeToggle] Toggling theme to: ${newTheme}`);
+    
+    // Optimistic update - change immediately
+    updateSettings({ theme: newTheme }).then((success) => {
+      if (success) {
+        console.log(`[handleThemeToggle] Theme persisted: ${newTheme}`);
       } else {
-        document.documentElement.classList.remove('dark');
+        console.warn('[handleThemeToggle] Failed to persist theme');
       }
-    } else {
-      console.error('[handleThemeToggle] Failed to update settings');
-    }
+    }).catch(error => {
+      console.error('[handleThemeToggle] Error:', error);
+    });
   };
 
-  const handleLanguageToggle = async () => {
-    console.log('[handleLanguageToggle] Starting...');
+  const handleLanguageToggle = () => {
     const newLang = settings.language === 'tr' ? 'en' : 'tr';
-    console.log(`[handleLanguageToggle] Attempting to change to: ${newLang}`);
-    const success = await updateSettings({ language: newLang });
-    console.log(`[handleLanguageToggle] updateSettings returned: ${success}`);
-    if (success) {
-      console.log(`[handleLanguageToggle] Language changed to: ${newLang}`);
-    } else {
-      console.error('[handleLanguageToggle] Failed to update settings');
-    }
+    console.log(`[handleLanguageToggle] Toggling language to: ${newLang}`);
+    
+    // Optimistic update - change immediately
+    updateSettings({ language: newLang }).then((success) => {
+      if (success) {
+        console.log(`[handleLanguageToggle] Language persisted: ${newLang}`);
+      } else {
+        console.warn('[handleLanguageToggle] Failed to persist language');
+      }
+    }).catch(error => {
+      console.error('[handleLanguageToggle] Error:', error);
+    });
   };
 
-  const handleCurrencyToggle = async () => {
-    console.log('[handleCurrencyToggle] Starting...');
+  const handleCurrencyToggle = () => {
     const newCurrency = settings.currency === 'TRY' ? 'USD' : 'TRY';
-    console.log(`[handleCurrencyToggle] Attempting to change to: ${newCurrency}`);
-    const success = await updateSettings({ currency: newCurrency });
-    console.log(`[handleCurrencyToggle] updateSettings returned: ${success}`);
-    if (success) {
-      console.log(`[handleCurrencyToggle] Currency changed to: ${newCurrency}`);
-    } else {
-      console.error('[handleCurrencyToggle] Failed to update settings');
-    }
+    console.log(`[handleCurrencyToggle] Toggling currency to: ${newCurrency}`);
+    
+    // Optimistic update - change immediately
+    updateSettings({ currency: newCurrency }).then((success) => {
+      if (success) {
+        console.log(`[handleCurrencyToggle] Currency persisted: ${newCurrency}`);
+      } else {
+        console.warn('[handleCurrencyToggle] Failed to persist currency');
+      }
+    }).catch(error => {
+      console.error('[handleCurrencyToggle] Error:', error);
+    });
   };
 
   const handleMonthChange = (month: number, year: number) => {

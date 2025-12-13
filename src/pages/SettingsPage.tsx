@@ -261,18 +261,40 @@ export function SettingsPage({ isOpen, onClose }: SettingsPageProps) {
 
   const handleSave = async () => {
     if (validateForm()) {
-      const success = await updateSettings(formData);
-      if (success) {
-        console.log('[SettingsPage] Settings saved successfully');
-        onClose();
-      } else {
-        console.error('[SettingsPage] Failed to save settings');
+      // Optimistic close - show success immediately
+      setImportMessage({ 
+        type: 'success', 
+        text: settings.language === 'tr' ? 'Ayarlar kaydediliyor...' : 'Saving settings...' 
+      });
+      
+      // Close dialog immediately for better UX
+      onClose();
+      
+      // Persist to database in background
+      updateSettings(formData).then((success) => {
+        if (success) {
+          console.log('[SettingsPage] Settings saved successfully');
+          setImportMessage({ 
+            type: 'success', 
+            text: settings.language === 'tr' ? 'Ayarlar kaydedildi' : 'Settings saved' 
+          });
+          setTimeout(() => setImportMessage(null), 2000);
+        } else {
+          console.error('[SettingsPage] Failed to save settings');
+          setImportMessage({ 
+            type: 'error', 
+            text: settings.language === 'tr' ? 'Ayarlar kaydedilemedi' : 'Failed to save settings' 
+          });
+          setTimeout(() => setImportMessage(null), 3000);
+        }
+      }).catch(error => {
+        console.error('[SettingsPage] Error saving settings:', error);
         setImportMessage({ 
           type: 'error', 
-          text: settings.language === 'tr' ? 'Ayarlar kaydedilemedi' : 'Failed to save settings' 
+          text: settings.language === 'tr' ? 'Hata oluştu' : 'An error occurred' 
         });
         setTimeout(() => setImportMessage(null), 3000);
-      }
+      });
     }
   };
 
