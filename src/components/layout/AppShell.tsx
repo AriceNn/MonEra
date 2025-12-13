@@ -148,47 +148,47 @@ export function AppShell({
                 {/* Currency Toggle - Icon only on tablet */}
                 <button
                   onClick={() => onCurrencyToggle?.()}
-                  className="flex items-center gap-2 px-2 lg:px-3 py-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors text-slate-700 dark:text-slate-300 font-medium text-sm"
+                  className="flex items-center gap-2 px-2 lg:px-4 py-2 lg:py-2.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors text-slate-700 dark:text-slate-300 font-medium text-sm lg:text-base"
                   title={`Switch to ${getNextCurrency()}`}
                   aria-label={`Currency: ${currency}`}
                 >
-                  <DollarSign className="w-4 h-4 text-slate-600 dark:text-slate-400" />
+                  <DollarSign className="w-4 h-4 lg:w-5 lg:h-5 text-slate-600 dark:text-slate-400" />
                   <span className="hidden lg:inline">{currency}</span>
                 </button>
 
                 {/* Language Toggle - Icon only on tablet */}
                 <button
                   onClick={() => onLanguageToggle?.()}
-                  className="flex items-center gap-2 px-2 lg:px-3 py-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors text-slate-700 dark:text-slate-300 font-medium text-sm"
+                  className="flex items-center gap-2 px-2 lg:px-4 py-2 lg:py-2.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors text-slate-700 dark:text-slate-300 font-medium text-sm lg:text-base"
                   title="Change Language"
                   aria-label={`Language: ${language}`}
                 >
-                  <Globe className="w-4 h-4 text-slate-600 dark:text-slate-400" />
+                  <Globe className="w-4 h-4 lg:w-5 lg:h-5 text-slate-600 dark:text-slate-400" />
                   <span className="hidden lg:inline">{language === 'tr' ? 'TR' : 'EN'}</span>
                 </button>
 
                 {/* Theme Toggle */}
                 <button
                   onClick={() => onThemeToggle?.()}
-                  className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors text-slate-700 dark:text-slate-300"
+                  className="p-2 lg:p-2.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors text-slate-700 dark:text-slate-300"
                   title={isDark ? 'Light Mode' : 'Dark Mode'}
                   aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
                 >
                   {isDark ? (
-                    <Sun className="w-4 h-4 text-yellow-500" />
+                    <Sun className="w-4 h-4 lg:w-5 lg:h-5 text-yellow-500" />
                   ) : (
-                    <Moon className="w-4 h-4 text-slate-600" />
+                    <Moon className="w-4 h-4 lg:w-5 lg:h-5 text-slate-600" />
                   )}
                 </button>
 
                 {/* Settings */}
                 <button
                   onClick={() => onSettingsClick?.()}
-                  className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors text-slate-700 dark:text-slate-300"
+                  className="p-2 lg:p-2.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors text-slate-700 dark:text-slate-300"
                   title="Settings"
                   aria-label="Open settings"
                 >
-                  <Settings className="w-4 h-4 text-slate-600 dark:text-slate-400" />
+                  <Settings className="w-4 h-4 lg:w-5 lg:h-5 text-slate-600 dark:text-slate-400" />
                 </button>
               </div>
             </div>
