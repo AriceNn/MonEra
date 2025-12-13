@@ -11,28 +11,6 @@
 
 **Track your finances with confidence. Offline-first, cloud-synced, bank-level security.**
 
-[Live Demo](https://monera.vercel.app) · [Documentation](./API.md) · [Report Bug](https://github.com/AriceNn/MonEra/issues) · [Request Feature](https://github.com/AriceNn/MonEra/issues)
-
-</div>
-
----
-
-## 📸 Screenshots
-
-<div align="center">
-
-### 🌅 Dashboard
-![Dashboard Light Mode](https://via.placeholder.com/800x450/4f46e5/ffffff?text=Dashboard+Light+Mode)
-
-### 🌙 Dark Mode
-![Dashboard Dark Mode](https://via.placeholder.com/800x450/1e293b/ffffff?text=Dashboard+Dark+Mode)
-
-### 📊 Analytics & Budgets
-<img src="https://via.placeholder.com/380x300/10b981/ffffff?text=Analytics" width="380"/> <img src="https://via.placeholder.com/380x300/f59e0b/ffffff?text=Budgets" width="380"/>
-
-### 📱 Mobile Responsive
-<img src="https://via.placeholder.com/250x450/6366f1/ffffff?text=Mobile+View" width="250"/>
-
 </div>
 
 ---
@@ -414,15 +392,7 @@ MonEra/
 │   │   └── calculations.test.ts # Unit tests (100% coverage)
 │   ├── App.tsx                  # Root component
 │   └── main.tsx                 # Entry point
-├── 📄 Documentation/
-│   ├── API.md                   # API documentation (577 lines)
-│   ├── DEPLOYMENT.md            # Production deployment guide
-│   ├── SECURITY_AUDIT.md        # Security report (90/100)
-│   ├── PRODUCTION_LAUNCH_REPORT.md # Launch checklist
-│   ├── P3_PLANNING.md           # Sprint 3 completion
-│   └── P4_PLANNING.md           # Future roadmap (7 sprints)
 ├── ⚙️ Configuration/
-│   ├── .env.example             # Environment template
 │   ├── .gitignore               # Git ignore rules
 │   ├── vite.config.ts           # Vite configuration
 │   ├── vitest.config.ts         # Test configuration
@@ -556,13 +526,11 @@ MonEraTest.testMigration()
 - `node_modules/` - Dependencies (install via `npm install`)
 - `dist/` - Build output (generated via `npm run build`)
 - `.env` - Environment variables (create from `.env.example`)
-- `outOfGit/` - Local development files
 
 **Tracked in Git**:
 - All source code (`src/`)
 - Documentation (`.md` files)
 - Configuration files
-- Environment template (`.env.example`)
 
 > ⚠️ **Important**: Never commit `.env` file with real credentials!
 
@@ -655,31 +623,6 @@ npm install
 
 ---
 
-## 📚 Documentation
-
-### 📖 User Documentation
-| Document | Description |
-|----------|-------------|
-| [README.md](./README.md) | This file - Getting started guide |
-| [DEPLOYMENT.md](./DEPLOYMENT.md) | Production deployment instructions |
-| [API.md](./API.md) | API endpoints and database schema |
-
-### 👨‍💻 Developer Documentation
-| Document | Description |
-|----------|-------------|
-| [P3_PLANNING.md](./P3_PLANNING.md) | Cloud sync architecture & sprint planning |
-| [P4_PLANNING.md](./P4_PLANNING.md) | Future roadmap & feature specifications |
-| [SECURITY_AUDIT.md](./SECURITY_AUDIT.md) | Security audit report & penetration tests |
-| [src/tests/security.test.ts](./src/tests/security.test.ts) | Automated security tests |
-
-### 🗄️ Database Documentation
-| Document | Description |
-|----------|-------------|
-| [supabase/schema.sql](./supabase/schema.sql) | PostgreSQL database schema |
-| [src/db/schema.ts](./src/db/schema.ts) | IndexedDB schema (Dexie) |
-
----
-
 ## 🤝 Contributing
 
 <div align="center">
@@ -769,78 +712,6 @@ chore: 🔧 Build/tooling
 
 ---
 
-## 🗺️ Roadmap
-
-### ✅ Completed Phases
-
-<table>
-<tr>
-<td width="25%">
-
-**P0: Foundation**  
-✅ 100% Complete
-
-- Core architecture
-- Transaction CRUD
-- Dashboard
-- 3 chart types
-- LocalStorage
-
-</td>
-<td width="25%">
-
-**P1: UI/UX**  
-✅ 100% Complete
-
-- Dark/Light themes
-- i18n (TR/EN)
-- Responsive design
-- Accessibility
-- Modern UI
-
-</td>
-<td width="25%">
-
-**P2: Advanced**  
-✅ 100% Complete
-
-- Budgets & alerts
-- Recurring transactions
-- Multi-currency
-- CSV export
-- Analytics
-
-</td>
-<td width="25%">
-
-**P3: Cloud Sync**  
-✅ 100% Complete
-
-- Authentication
-- Cloud sync
-- RLS security
-- 90/100 score
-- Offline-first
-
-</td>
-</tr>
-</table>
-
-### 🚀 Upcoming: Phase 4 (Q1 2026)
-
-| Sprint | Feature | Duration | Status |
-|--------|---------|----------|--------|
-| 1 | 📸 Receipt Management (OCR) | 1 week | 📋 Planned |
-| 2 | 🔍 Advanced Search | 1 week | 📋 Planned |
-| 3 | 📊 Data Import/Export | 1 week | 📋 Planned |
-| 4 | 🤖 AI Smart Categories | 2 weeks | 📋 Planned |
-| 5 | ⚡ Performance Optimization | 1 week | 📋 Planned |
-| 6 | 📱 Mobile App (React Native) | 2 weeks | 📋 Planned |
-| 7 | 🧪 Testing & Polish | 1 week | 📋 Planned |
-
-> 📄 **Detailed roadmap**: [P4_PLANNING.md](./P4_PLANNING.md)
-
----
 
 ## 📊 Project Statistics
 
@@ -986,20 +857,18 @@ See [LICENSE](./LICENSE) file for full text.
 **Built with ❤️ by developers, for everyone**
 
 [![GitHub Repo](https://img.shields.io/badge/GitHub-MonEra-blue?style=for-the-badge&logo=github)](https://github.com/AriceNn/MonEra)
-[![Live Demo](https://img.shields.io/badge/Demo-Live-success?style=for-the-badge&logo=vercel)](https://monera.vercel.app)
 [![Documentation](https://img.shields.io/badge/Docs-Read-orange?style=for-the-badge&logo=readthedocs)](./API.md)
 
 **Made with:** React 19 · TypeScript · Supabase · Tailwind CSS · Vite
 
 **Last Updated:** December 13, 2025  
 **Version:** 3.0.0-cloud  
-**Status:** ✅ Production Ready
 
 ---
 
 **⭐ Star us on GitHub** · **🐛 Report Bug** · **💡 Request Feature** · **🤝 Contribute**
 
-[GitHub](https://github.com/AriceNn/MonEra) • [Documentation](./API.md) • [Deployment Guide](./DEPLOYMENT.md) • [Security](./SECURITY_AUDIT.md)
+[GitHub](https://github.com/AriceNn/MonEra) 
 
 ---
 
