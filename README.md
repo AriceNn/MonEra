@@ -2,7 +2,7 @@
 
 <div align="center">
 
-[![Version](https://img.shields.io/badge/version-3.0.0-blue?style=for-the-badge)](https://github.com/AriceNn/MonEra)
+[![Version](https://img.shields.io/badge/version-1.0.0-blue?style=for-the-badge)](https://github.com/AriceNn/MonEra)
 [![License](https://img.shields.io/badge/license-MIT-green?style=for-the-badge)](LICENSE)
 [![TypeScript](https://img.shields.io/badge/TypeScript-Strict-blue?style=for-the-badge)](./tsconfig.json)
 
@@ -153,7 +153,7 @@ Built with the following open-source tools and services:
 [![Issues](https://img.shields.io/github/issues/AriceNn/MonEra?style=flat-square)](https://github.com/AriceNn/MonEra/issues)
 [![Pull Requests](https://img.shields.io/github/issues-pr/AriceNn/MonEra?style=flat-square)](https://github.com/AriceNn/MonEra/pulls)
 
-**Version:** 3.0.0-cloud | **Last Updated:** December 20, 2025
+**Version:** 1.0.0-cloud | **Last Updated:** December 20, 2025
 
 © 2025 MonEra. MIT License.
 
